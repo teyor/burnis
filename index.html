@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#121214">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Burnis – prototyyppi</title>
+<link rel="icon" href="data:,">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#121214;color:#fff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;overscroll-behavior:none}
+  body{position:fixed;inset:0}
+  canvas#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #hud{position:absolute;inset:0;pointer-events:none}
+  #topbar{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;
+    display:flex;align-items:center;gap:10px;background:linear-gradient(#000c,#0000)}
+  #btnRestart{pointer-events:auto;width:44px;height:44px;border-radius:12px;border:2px solid #fff4;background:#0008;color:#fff;
+    font-size:24px;line-height:1;flex:0 0 auto;cursor:pointer}
+  #tireBox{flex:1 1 auto;min-width:0}
+  #tireLbl{display:flex;justify-content:space-between;font-size:12px;font-weight:800;letter-spacing:.08em;opacity:.95}
+  #tireLbl b{font-size:20px;letter-spacing:0}
+  #tireBar{position:relative;height:18px;border-radius:9px;background:#1b1b1d;border:2px solid #fff5;overflow:hidden;margin-top:3px}
+  #tireFill{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:7px;background:#3ad46a;transition:background .2s}
+  #tireBar .zone{position:absolute;top:0;bottom:0;left:0;width:10%;
+    background:repeating-linear-gradient(135deg,#ffd40055 0 5px,#0000 5px 10px)}
+  #tireBar .mk{position:absolute;top:0;bottom:0;width:2px;background:#fff8}
+  #tireSub{display:flex;justify-content:space-between;font-size:11px;opacity:.8;margin-top:2px}
+  #progBar{height:4px;border-radius:2px;background:#fff2;margin-top:4px;overflow:hidden}
+  #progFill{height:100%;width:0;background:#9fd3ff}
+  #tach{width:86px;height:86px;flex:0 0 auto}
+  #warn{position:absolute;left:50%;top:24%;transform:translateX(-50%);padding:10px 16px;border-radius:12px;
+    background:#c40d0dd9;border:2px solid #ffb3b3;font-weight:900;font-size:20px;text-align:center;white-space:nowrap;display:none;
+    animation:blink .25s steps(2) infinite}
+  @keyframes blink{50%{opacity:.35}}
+  #hint{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;font-size:15px;
+    font-weight:700;opacity:.9;text-shadow:0 2px 4px #000}
+  #bigmsg{position:absolute;left:0;right:0;top:40%;transform:translateY(-50%);text-align:center;font-weight:900;
+    font-size:56px;letter-spacing:.02em;text-shadow:0 4px 0 #000,0 0 24px #000;opacity:0}
+  #bigmsg.show{animation:pop 1.1s ease-out forwards}
+  #bigmsg.hold{animation:popHold .5s ease-out forwards}
+  #bigmsg.bang{color:#ffde3b;font-size:84px;animation:bang 1.6s ease-out forwards}
+  #bigmsg small{display:block;font-size:22px;color:#fff}
+  @keyframes pop{0%{opacity:0;transform:translateY(-50%) scale(.4)}15%{opacity:1;transform:translateY(-50%) scale(1.15)}
+    30%{transform:translateY(-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+  @keyframes popHold{0%{opacity:0;transform:translateY(-50%) scale(.4)}40%{opacity:1;transform:translateY(-50%) scale(1.1)}100%{opacity:1;transform:translateY(-50%) scale(1)}}
+  @keyframes bang{0%{opacity:0;transform:translateY(-50%) scale(.2) rotate(-8deg)}10%{opacity:1;transform:translateY(-50%) scale(1.4) rotate(4deg)}
+    25%{transform:translateY(-50%) scale(1) rotate(-2deg)}85%{opacity:1}100%{opacity:0;transform:translateY(-50%) scale(1.05)}}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 14px);background:#0b0b0de8;overflow-y:auto;touch-action:pan-y}
+  .overlay.hidden{display:none}
+  #resultScreen{justify-content:flex-end;background:linear-gradient(#0000 0%,#000a 45%,#000e 100%)}
+  h1.logo{margin:0;font-size:68px;font-style:italic;font-weight:900;letter-spacing:.02em;line-height:1;
+    background:linear-gradient(#fff6b0,#ffb300 45%,#ff4b1f 75%,#b3120a);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 4px 0 #000) drop-shadow(0 0 18px #ff530088)}
+  .tag{margin:6px 0 14px;font-size:15px;opacity:.85;text-align:center}
+  .cars{display:flex;gap:10px;width:100%;max-width:440px}
+  .car{flex:1;border:3px solid #fff2;border-radius:16px;background:#1d1d21;color:#fff;padding:8px 8px 10px;text-align:center;cursor:pointer;font:inherit}
+  .car.sel{border-color:#ffb300;background:#2a2316;box-shadow:0 0 18px #ffb30055}
+  .car canvas{width:100%;height:70px;display:block}
+  .car .nm{font-weight:900;font-size:17px;margin-top:2px}
+  .car .ds{font-size:12px;opacity:.8;margin-top:3px;min-height:46px}
+  .car .st{font-size:12px;margin-top:4px;text-align:left;line-height:1.5}
+  .car .st span{color:#ffb300;letter-spacing:1px}
+  .row{display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700}
+  .seg{border:2px solid #fff3;background:#1d1d21;color:#fff;border-radius:10px;width:44px;height:38px;font:inherit;font-weight:800;cursor:pointer}
+  .seg.sel{border-color:#ffb300;background:#3a2c10}
+  .best{margin-top:10px;font-size:14px;opacity:.9}
+  .big{margin-top:14px;width:100%;max-width:440px;height:62px;border:0;border-radius:16px;font:inherit;font-weight:900;font-size:26px;letter-spacing:.06em;
+    color:#1a0d00;background:linear-gradient(#ffd25a,#ff8a00);box-shadow:0 5px 0 #a24a00;cursor:pointer}
+  .big:active{transform:translateY(3px);box-shadow:0 2px 0 #a24a00}
+  .big.alt{background:linear-gradient(#e9e9ee,#9a9aa5);box-shadow:0 5px 0 #4b4b55;font-size:20px;height:52px}
+  .help{margin-top:12px;font-size:13px;line-height:1.45;opacity:.85;max-width:440px;text-align:left}
+  .help b{color:#ffcf5a}
+  .card{width:100%;max-width:440px;background:#17171bf0;border:2px solid #fff2;border-radius:18px;padding:14px 14px 16px;text-align:center}
+  #resTitle{font-size:32px;font-weight:900;line-height:1.1}
+  #resSub{font-size:15px;opacity:.85;margin-top:4px}
+  #resWear{font-size:54px;font-weight:900;margin-top:6px;line-height:1}
+  #resWear small{font-size:16px;font-weight:700;opacity:.8;display:block;margin-top:2px}
+  #resPts{font-size:24px;font-weight:900;margin-top:8px;color:#ffcf5a}
+  #resBonus{font-size:18px;font-weight:900;color:#ff5a2a;margin-top:4px}
+  #resBest{font-size:14px;margin-top:6px;opacity:.9}
+  .btns{display:flex;gap:10px}
+  .btns .big{margin-top:12px}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <button id="btnRestart" aria-label="Aloita alusta">↻</button>
+    <div id="tireBox">
+      <div id="tireLbl"><span>RENKAAT</span><b id="tireTxt">100 %</b></div>
+      <div id="tireBar"><div id="tireFill"></div><div class="zone"></div>
+        <div class="mk" style="left:30%"></div><div class="mk" style="left:10%"></div><div class="mk" style="left:2%"></div></div>
+      <div id="tireSub"><span id="wearTxt">Kuluma 0 %</span><span id="lapTxt">Kierros 1/1</span></div>
+      <div id="progBar"><div id="progFill"></div></div>
+    </div>
+    <canvas id="tach"></canvas>
+  </div>
+  <div id="warn">KAASUA! Moottori sammuu!</div>
+  <div id="bigmsg"></div>
+  <div id="hint">Pidä sormi ruudulla = kaasu · nosta = kierrokset laskevat</div>
+</div>
+
+<div id="startScreen" class="overlay">
+  <h1 class="logo">BURNIS</h1>
+  <div class="tag">Polta kumit loppuun – mutta vasta maalissa!</div>
+  <div class="cars">
+    <button class="car sel" data-car="perus"><canvas data-prev="perus"></canvas><div class="nm">Perusauto</div>
+      <div class="ds">Vakaa ja helppo. Hyvä V8 aloittelijalle.</div>
+      <div class="st">Teho <span>●●○</span><br>Kulutus <span>●●○</span><br>Herkkyys <span>●○○</span></div></button>
+    <button class="car" data-car="super"><canvas data-prev="super"></canvas><div class="nm">Supercharged</div>
+      <div class="ds">Ahdin ulvoo! Lisää tehoa, syö kumia rajusti, herkkä kaasu.</div>
+      <div class="st">Teho <span>●●●</span><br>Kulutus <span>●●●</span><br>Herkkyys <span>●●●</span></div></button>
+  </div>
+  <div class="row">Kierroksia:
+    <button class="seg sel" data-laps="1">1</button><button class="seg" data-laps="2">2</button><button class="seg" data-laps="3">3</button></div>
+  <div class="best" id="bestTxt">Ennätys: –</div>
+  <button class="big" id="btnStart">ALOITA</button>
+  <div class="help">
+    <b>Pidä sormi ruudulla</b> = kaasu, kierrokset nousevat ja renkaat sutivat. <b>Nosta sormi</b> = kierrokset laskevat.<br>
+    Hidas vauhti + kovat kierrokset kuluttaa kumia nopeasti. Liian kova vauhti → renkaat jäävät ehjiksi. Liian vähän kierroksia → moottori yskii ja sammuu.
+    Renkaat eivät saa räjähtää ennen maalia!<br>
+    <b>Perfect Burnout:</b> jatka polttamista maalin jälkeen – jos renkaat räjähtävät sekunnin sisällä, saat <b>tuplapisteet</b>.<br>
+    🔊 Laita äänet päälle. (Tietokoneella: välilyönti tai hiiri = kaasu.)
+  </div>
+</div>
+
+<div id="resultScreen" class="overlay hidden">
+  <div class="card">
+    <div id="resTitle">HYVÄ!</div>
+    <div id="resSub"></div>
+    <div id="resWear">0 %<small>renkaiden kuluma maalissa</small></div>
+    <div id="resPts">0 pistettä</div>
+    <div id="resBonus"></div>
+    <div id="resBest"></div>
+    <div class="btns">
+      <button class="big" id="btnAgain">UUDESTAAN</button>
+    </div>
+    <button class="big alt" id="btnMenu">VAIHDA AUTO</button>
+  </div>
+</div>
+<script>
+'use strict';
+(function(){
+const $ = s => document.querySelector(s);
+const clamp = (x,a,b) => x<a?a:x>b?b:x;
+const lerp = (a,b,t) => a+(b-a)*t;
+const rand = (a,b) => a+Math.random()*(b-a);
+const TAU = Math.PI*2;
+
+/*PHYS_START*/
+const CARS = {
+  perus: { id:'perus', name:'Perusauto', rise:1.8, fall:1.4, A:0.45, D:0.10, Dc:0.03, Brk:0.20, W:22, P:1.6, T1:8,
+           stallR:0.30, stallT:0.9, warnR:0.38,
+           body:'#45bfae', bodyDark:'#23786c', roof:'#f3eddc', stripe:null, blower:false, whitewall:true },
+  super: { id:'super', name:'Supercharged', rise:3.2, fall:2.2, A:0.60, D:0.10, Dc:0.03, Brk:0.20, W:30, P:1.6, T1:8,
+           stallR:0.30, stallT:0.7, warnR:0.38,
+           body:'#e2581f', bodyDark:'#8a2c0a', roof:'#1a1a1a', stripe:'#151515', blower:true, whitewall:false }
+};
+// One physics step. s = {r: rpm 0..1, v: road speed 0..1, wear %, prog 0..1 over all laps}
+function physStep(s, hold, car, dt, laps, finished){
+  if (hold) s.r = Math.min(1, s.r + car.rise*dt);
+  else { const t = 0.15 + 0.85*s.v; s.r = s.r > t ? Math.max(t, s.r - car.fall*dt) : Math.min(t, s.r + car.fall*dt); }
+  s.slip = Math.max(0, s.r - s.v);                 // wheelspin
+  let dv = car.A*s.slip - car.D*s.v - car.Dc - (hold ? 0 : car.Brk);
+  if (finished) dv -= 1.6;                         // brakes on after the finish line -> standing burnout
+  s.v = clamp(s.v + dv*dt, 0, 1);
+  s.wr = car.W*Math.pow(s.slip, car.P)*(finished ? 0.5 : 1/laps);   // tire wear rate, %/s (halved after finish)
+  s.wear += s.wr*dt;
+  s.prog += s.v/(car.T1*laps)*dt;
+}
+/*PHYS_END*/
+
+const BONUS_WINDOW = 1.0;   // seconds after finish for Perfect Burnout
+const LS = 'burnis.best.';
+
+// ---------------------------------------------------------------- canvas & layout
+const cv = $('#game'), ctx = cv.getContext('2d');
+const tachCv = $('#tach'), tctx = tachCv.getContext('2d');
+let W=0, H=0, dpr=1, cx=0, cy=0, R=100, CL=40, CWd=17, lane=40;
+let bg = document.createElement('canvas'), marks = document.createElement('canvas'), mctx = marks.getContext('2d');
+const smokeSpr = makeSprite(255,255,255), smokeSpr2 = makeSprite(205,205,210), darkSpr = makeSprite(60,60,60);
+
+function makeSprite(r,g,b){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(0.45, `rgba(${r},${g},${b},.55)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0,0,64,64); return c;
+}
+
+function layout(){
+  W = window.innerWidth; H = window.innerHeight; dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  cx = W/2; cy = H*0.55;
+  R = Math.min(W*0.37, H*0.27);
+  CL = R*0.46; CWd = CL*0.42; lane = CL*1.1;
+  genBackground();
+  marks.width = cv.width; marks.height = cv.height;
+  mctx.setTransform(dpr,0,0,dpr,0,0); mctx.lineCap = 'round';
+  lastRear = null;
+  const ts = 86; tachCv.width = ts*dpr; tachCv.height = ts*dpr;
+}
+
+function genBackground(){
+  bg.width = cv.width; bg.height = cv.height;
+  const b = bg.getContext('2d');
+  b.setTransform(1,0,0,1,0,0);
+  b.fillStyle = '#3c3d40'; b.fillRect(0,0,bg.width,bg.height);
+  // grain (noise tile used as a pattern, cheap on phones)
+  const tile=document.createElement('canvas'); tile.width=tile.height=256;
+  const tx=tile.getContext('2d'), img=tx.createImageData(256,256), d=img.data;
+  for (let i=0;i<d.length;i+=4){
+    const n = 60 + (Math.random()*30-15) + (Math.random()<0.04 ? rand(10,30) : 0) - (Math.random()<0.03 ? 18 : 0);
+    d[i]=n; d[i+1]=n+1; d[i+2]=n+4; d[i+3]=255;
+  }
+  tx.putImageData(img,0,0);
+  b.fillStyle=b.createPattern(tile,'repeat'); b.fillRect(0,0,bg.width,bg.height);
+  b.setTransform(dpr,0,0,dpr,0,0);
+  // blotches / patches / oil
+  for (let i=0;i<14;i++){
+    const x=rand(0,W), y=rand(0,H), r=rand(30,120), g=b.createRadialGradient(x,y,0,x,y,r);
+    const dark = Math.random()<0.6;
+    g.addColorStop(0, dark?'rgba(0,0,0,.18)':'rgba(255,255,255,.05)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    b.fillStyle=g; b.fillRect(x-r,y-r,2*r,2*r);
+  }
+  b.fillStyle='rgba(20,20,22,.35)';
+  for (let i=0;i<3;i++){ const x=rand(0,W),y=rand(0,H); b.save(); b.translate(x,y); b.rotate(rand(0,3)); b.fillRect(-rand(30,60),-rand(20,40),rand(60,120),rand(40,80)); b.restore(); }
+  // cracks
+  b.strokeStyle='rgba(15,15,15,.55)'; b.lineWidth=1;
+  for (let i=0;i<10;i++){
+    let x=rand(0,W), y=rand(0,H), a=rand(0,TAU); b.beginPath(); b.moveTo(x,y);
+    for (let k=0;k<rand(6,16);k++){ a+=rand(-.7,.7); x+=Math.cos(a)*rand(5,14); y+=Math.sin(a)*rand(5,14); b.lineTo(x,y); }
+    b.stroke();
+  }
+  // faded parking stalls along left & right edges
+  b.strokeStyle='rgba(235,225,180,.22)'; b.lineWidth=3;
+  for (let y=H*0.2; y<H; y+=46){ b.beginPath(); b.moveTo(0,y); b.lineTo(W*0.1,y); b.moveTo(W,y+20); b.lineTo(W*0.9,y+20); b.stroke(); }
+  // track band
+  b.lineWidth = lane; b.strokeStyle='rgba(0,0,0,.16)'; b.beginPath(); b.arc(cx,cy,R,0,TAU); b.stroke();
+  // painted edge lines (dashed white) and centre (faded yellow)
+  b.lineWidth = 3; b.strokeStyle='rgba(240,240,235,.85)'; b.setLineDash([16,10]);
+  b.beginPath(); b.arc(cx,cy,R+lane/2,0,TAU); b.stroke();
+  b.beginPath(); b.arc(cx,cy,R-lane/2,0,TAU); b.stroke();
+  b.setLineDash([6,14]); b.lineWidth=2; b.strokeStyle='rgba(255,205,60,.35)';
+  b.beginPath(); b.arc(cx,cy,R,0,TAU); b.stroke(); b.setLineDash([]);
+  // start/finish checkered line at the top
+  const sq = lane/6, x0 = cx - 1.5*sq;
+  for (let i=0;i<6;i++) for (let j=0;j<3;j++){
+    b.fillStyle = ((i+j)%2) ? 'rgba(240,240,240,.9)' : 'rgba(20,20,20,.9)';
+    b.fillRect(x0 + j*sq - sq*0, cy-R-lane/2 + i*sq, sq, sq);
+  }
+  b.fillStyle='rgba(255,255,255,.75)'; b.font=`900 ${Math.round(lane*0.32)}px system-ui,Arial`; b.textAlign='center';
+  b.fillText('LÄHTÖ / MAALI', cx, cy-R-lane/2-10);
+  // centre logo painted on asphalt
+  b.save(); b.translate(cx,cy); b.rotate(-0.12);
+  b.fillStyle='rgba(255,180,0,.16)'; b.font=`italic 900 ${Math.round(R*0.42)}px system-ui,Arial`; b.textAlign='center'; b.textBaseline='middle';
+  b.fillText('BURNIS', 0, 0); b.restore();
+  // traffic cones outside track
+  for (let i=0;i<10;i++){
+    const a = i/10*TAU + 0.31, rr = R + lane/2 + 16, x = cx+Math.cos(a)*rr, y = cy+Math.sin(a)*rr;
+    if (y < 70 || Math.abs(Math.cos(a)) < 0.35 && Math.sin(a) < 0) continue;
+    b.fillStyle='rgba(0,0,0,.35)'; b.beginPath(); b.arc(x+2,y+3,8,0,TAU); b.fill();
+    b.fillStyle='#ff6a13'; b.beginPath(); b.arc(x,y,8,0,TAU); b.fill();
+    b.fillStyle='#f4f4f4'; b.beginPath(); b.arc(x,y,5,0,TAU); b.fill();
+    b.fillStyle='#ff6a13'; b.beginPath(); b.arc(x,y,3,0,TAU); b.fill();
+  }
+}
+
+// ---------------------------------------------------------------- car drawing
+function rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function drawCar(c, x, y, ang, car, L, w, o){
+  o = o || {};
+  c.save(); c.translate(x,y); c.rotate(ang);
+  // shadow
+  c.fillStyle='rgba(0,0,0,.4)'; rr(c,-L/2+3,-w/2+4,L,w,w*0.3); c.fill();
+  // wheels
+  const tl=L*0.18, tw=w*0.26;
+  const wheel=(wx,wy,rear)=>{
+    c.save(); c.translate(wx,wy);
+    if (rear && o.blown){ c.fillStyle='#a9abb0'; rr(c,-tl*0.42,-tw*0.32,tl*0.84,tw*0.64,2); c.fill();
+      c.fillStyle='#222'; c.fillRect(-tl*0.5,-tw*0.45,tl*0.2,tw*0.3); c.restore(); return; }
+    c.fillStyle='#0d0d0d'; rr(c,-tl/2,-tw/2,tl,tw,2.5); c.fill();
+    c.strokeStyle='#2a2a2a'; c.lineWidth=1;
+    const ph = rear ? (o.spin||0)%1 : 0;
+    for (let k=0;k<4;k++){ const xx=-tl/2 + ((k/4+ph)%1)*tl; c.beginPath(); c.moveTo(xx,-tw/2); c.lineTo(xx,tw/2); c.stroke(); }
+    if (car.whitewall){ c.fillStyle='#e9e6dc'; c.fillRect(-tl*0.38, wy>0? tw*0.3 : -tw*0.42, tl*0.76, tw*0.12); }
+    c.restore();
+  };
+  wheel(L*0.30,-w*0.47,false); wheel(L*0.30,w*0.47,false); wheel(-L*0.29,-w*0.47,true); wheel(-L*0.29,w*0.47,true);
+  // tail fins
+  c.fillStyle=car.bodyDark;
+  c.beginPath(); c.moveTo(-L*0.30,-w/2); c.lineTo(-L*0.55,-w*0.5); c.lineTo(-L*0.47,-w*0.30); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(-L*0.30, w/2); c.lineTo(-L*0.55, w*0.5); c.lineTo(-L*0.47, w*0.30); c.closePath(); c.fill();
+  // body
+  const g=c.createLinearGradient(0,-w/2,0,w/2);
+  g.addColorStop(0,car.bodyDark); g.addColorStop(0.22,car.body); g.addColorStop(0.5,lighten(car.body,0.25)); g.addColorStop(0.78,car.body); g.addColorStop(1,car.bodyDark);
+  c.fillStyle=g; rr(c,-L/2,-w/2,L,w,w*0.28); c.fill();
+  // racing stripes
+  if (car.stripe){ c.fillStyle=car.stripe; c.fillRect(-L*0.48,-w*0.16,L*0.96,w*0.09); c.fillRect(-L*0.48,w*0.07,L*0.96,w*0.09); }
+  // chrome side trim
+  c.strokeStyle='rgba(255,255,255,.65)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(-L*0.44,-w*0.43); c.lineTo(L*0.42,-w*0.43); c.moveTo(-L*0.44,w*0.43); c.lineTo(L*0.42,w*0.43); c.stroke();
+  // bumpers (chrome)
+  const chrome=(bx,len)=>{ const cg=c.createLinearGradient(bx,0,bx+len,0); cg.addColorStop(0,'#f8f8f8'); cg.addColorStop(.5,'#9a9ca3'); cg.addColorStop(1,'#ececec');
+    c.fillStyle=cg; rr(c,bx,-w*0.49,len,w*0.98,len/2); c.fill(); };
+  chrome(L*0.475, L*0.055); chrome(-L*0.53, L*0.05);
+  // headlights & tail lights
+  c.fillStyle='#fff7cf'; c.beginPath(); c.arc(L*0.465,-w*0.33,w*0.085,0,TAU); c.arc(L*0.465,w*0.33,w*0.085,0,TAU); c.fill();
+  c.fillStyle= o.brake ? '#ff3030' : '#b0121a';
+  c.fillRect(-L*0.51,-w*0.45,L*0.04,w*0.13); c.fillRect(-L*0.51,w*0.32,L*0.04,w*0.13);
+  if (o.brake){ c.fillStyle='rgba(255,40,40,.35)'; c.beginPath(); c.arc(-L*0.52,-w*0.38,w*0.22,0,TAU); c.arc(-L*0.52,w*0.38,w*0.22,0,TAU); c.fill(); }
+  // hood creases
+  c.strokeStyle='rgba(0,0,0,.18)'; c.beginPath(); c.moveTo(L*0.12,-w*0.12); c.lineTo(L*0.46,-w*0.12); c.moveTo(L*0.12,w*0.12); c.lineTo(L*0.46,w*0.12); c.stroke();
+  // windshield
+  const gg=c.createLinearGradient(L*0.02,0,L*0.15,0); gg.addColorStop(0,'#1a2532'); gg.addColorStop(1,'#4d6e8e');
+  c.fillStyle=gg; c.beginPath(); c.moveTo(L*0.15,-w*0.40); c.lineTo(L*0.15,w*0.40); c.lineTo(L*0.03,w*0.34); c.lineTo(L*0.03,-w*0.34); c.closePath(); c.fill();
+  c.fillStyle='rgba(255,255,255,.25)'; c.beginPath(); c.moveTo(L*0.135,-w*0.30); c.lineTo(L*0.11,-w*0.30); c.lineTo(L*0.07,w*0.1); c.lineTo(L*0.095,w*0.1); c.closePath(); c.fill();
+  // roof
+  const rg=c.createLinearGradient(0,-w*0.36,0,w*0.36); rg.addColorStop(0,shade(car.roof,0.75)); rg.addColorStop(.5,car.roof); rg.addColorStop(1,shade(car.roof,0.75));
+  c.fillStyle=rg; rr(c,-L*0.22,-w*0.36,L*0.25,w*0.72,w*0.12); c.fill();
+  // rear window
+  c.fillStyle='#22303f'; c.beginPath(); c.moveTo(-L*0.22,-w*0.32); c.lineTo(-L*0.22,w*0.32); c.lineTo(-L*0.29,w*0.36); c.lineTo(-L*0.29,-w*0.36); c.closePath(); c.fill();
+  // supercharger blower poking through the hood
+  if (car.blower){
+    const bx=L*0.17, bl=L*0.2, bw=w*0.36;
+    const bg2=c.createLinearGradient(0,-bw/2,0,bw/2); bg2.addColorStop(0,'#8d9096'); bg2.addColorStop(.5,'#f5f5f5'); bg2.addColorStop(1,'#7b7e85');
+    c.fillStyle=bg2; rr(c,bx,-bw/2,bl,bw,3); c.fill();
+    c.strokeStyle='rgba(0,0,0,.35)'; for(let k=1;k<6;k++){ c.beginPath(); c.moveTo(bx+k*bl/6,-bw/2); c.lineTo(bx+k*bl/6,bw/2); c.stroke(); }
+    c.fillStyle='#111'; rr(c,bx+bl*0.55,-bw*0.32,bl*0.5,bw*0.64,2); c.fill();   // scoop
+    c.fillStyle='#333'; c.fillRect(bx+bl*0.95,-bw*0.25,bl*0.08,bw*0.5);
+  } else {
+    // hood ornament
+    c.fillStyle='#e8e8e8'; c.beginPath(); c.moveTo(L*0.47,0); c.lineTo(L*0.40,-w*0.04); c.lineTo(L*0.40,w*0.04); c.closePath(); c.fill();
+  }
+  c.restore();
+}
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)]; }
+function lighten(h,a){ const [r,g,b]=hexToRgb(h); return `rgb(${Math.round(r+(255-r)*a)},${Math.round(g+(255-g)*a)},${Math.round(b+(255-b)*a)})`; }
+function shade(h,a){ const [r,g,b]=hexToRgb(h); return `rgb(${Math.round(r*a)},${Math.round(g*a)},${Math.round(b*a)})`; }
+
+// ---------------------------------------------------------------- audio (Web Audio, all synthesized)
+const Snd = {
+  ctx:null, ok:false, n:{}, engineOn:false, blower:false,
+  unlock(){
+    try{
+      if (!this.ctx){
+        const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+        try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
+        this.ctx = new AC(); this.build();
+      }
+      if (this.ctx.state !== 'running') this.ctx.resume();
+      // iOS: play a silent buffer inside the gesture
+      const b = this.ctx.createBuffer(1,1,22050), s = this.ctx.createBufferSource(); s.buffer=b; s.connect(this.ctx.destination); s.start(0);
+    }catch(e){ console.warn('audio', e); }
+  },
+  build(){
+    const a = this.ctx, n = this.n;
+    const nb = a.createBuffer(1, a.sampleRate*2, a.sampleRate), nd = nb.getChannelData(0);
+    for (let i=0;i<nd.length;i++) nd[i] = Math.random()*2-1;
+    this.noiseBuf = nb;
+    const noise = () => { const s=a.createBufferSource(); s.buffer=nb; s.loop=true; s.start(0, Math.random()*1.5); return s; };
+    const osc = (type,f) => { const o=a.createOscillator(); o.type=type; o.frequency.value=f; o.start(); return o; };
+    const gain = v => { const g=a.createGain(); g.gain.value=v; return g; };
+    const filt = (type,f,q) => { const b=a.createBiquadFilter(); b.type=type; b.frequency.value=f; b.Q.value=q||0.7; return b; };
+
+    n.comp = a.createDynamicsCompressor(); n.comp.threshold.value=-14; n.comp.ratio.value=5; n.comp.connect(a.destination);
+    n.master = gain(0.9); n.master.connect(n.comp);
+    // engine chain: oscs -> mix -> shaper -> lowpass -> AM -> cough -> engineOut
+    n.engOut = gain(0); n.engOut.connect(n.master);
+    n.cough = gain(1); n.cough.connect(n.engOut);
+    n.am = gain(0.6); n.am.connect(n.cough);
+    n.lp = filt('lowpass', 600, 1.2); n.lp.connect(n.am);
+    n.shaper = a.createWaveShaper(); n.shaper.curve = this.curve(2.5); n.shaper.connect(n.lp);
+    n.mix = gain(1); n.mix.connect(n.shaper);
+    n.o1 = osc('sawtooth', 50); const g1=gain(0.45); n.o1.connect(g1); g1.connect(n.mix);
+    n.o2 = osc('square', 25);   const g2=gain(0.30); n.o2.connect(g2); g2.connect(n.mix);
+    n.o3 = osc('sawtooth', 25.3); const g3=gain(0.25); n.o3.connect(g3); g3.connect(n.mix);
+    n.sub = osc('sine', 12.5);  n.subG=gain(0.5); n.sub.connect(n.subG); n.subG.connect(n.cough);
+    // lumpy cam-speed amplitude modulation (V8 lope)
+    n.lfo = osc('triangle', 6); n.lfoG = gain(0.4); n.lfo.connect(n.lfoG); n.lfoG.connect(n.am.gain);
+    // exhaust rasp noise, also modulated
+    n.exN = noise(); n.exBP = filt('bandpass', 300, 0.9); n.exG = gain(0.2); n.exN.connect(n.exBP); n.exBP.connect(n.exG); n.exG.connect(n.am);
+    // tire squeal
+    n.sqN = noise(); n.sqBP1 = filt('bandpass', 2100, 7); n.sqBP2 = filt('bandpass', 3300, 10); n.sqG = gain(0);
+    n.sqN.connect(n.sqBP1); n.sqN.connect(n.sqBP2); n.sqBP1.connect(n.sqG); n.sqBP2.connect(n.sqG); n.sqG.connect(n.master);
+    n.sqT = osc('triangle', 1250); n.sqVib = osc('sine', 7); n.sqVibG = gain(35); n.sqVib.connect(n.sqVibG); n.sqVibG.connect(n.sqT.frequency);
+    n.sqTG = gain(0); n.sqT.connect(n.sqTG); n.sqTG.connect(n.master);
+    n.hsN = noise(); n.hsHP = filt('highpass', 4500, 0.7); n.hsG = gain(0); n.hsN.connect(n.hsHP); n.hsHP.connect(n.hsG); n.hsG.connect(n.master);
+    // supercharger whine
+    n.wh = osc('sawtooth', 400); n.whBP = filt('bandpass', 800, 4); n.whG = gain(0); n.wh.connect(n.whBP); n.whBP.connect(n.whG); n.whG.connect(n.master);
+    n.wh2 = osc('sine', 800); n.wh2G = gain(0); n.wh2.connect(n.wh2G); n.wh2G.connect(n.master);
+    this.ok = true;
+  },
+  curve(k){ const c=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/511.5-1; c[i]=Math.tanh(k*x)/Math.tanh(k); } return c; },
+  // called every frame
+  update(r, throttle, wr, running){
+    if (!this.ok) return;
+    const a=this.ctx, n=this.n, t=a.currentTime, T=0.03;
+    const set=(p,v,tc)=>p.setTargetAtTime(v,t,tc||T);
+    const on = this.engineOn;
+    const rpm = 700 + r*6300, fire = rpm/60*4;
+    const lump = (1-r);
+    set(n.o1.frequency, fire*(1+rand(-0.012,0.012)*lump));
+    set(n.o2.frequency, fire/2*(1+rand(-0.02,0.02)*lump));
+    set(n.o3.frequency, fire/2*1.012);
+    set(n.sub.frequency, fire/4);
+    set(n.lfo.frequency, rpm/120);
+    set(n.lfoG.gain, 0.15 + 0.35*lump);
+    set(n.am.gain, 0.65);
+    set(n.lp.frequency, 220 + r*2300 + throttle*500);
+    set(n.exBP.frequency, fire*2.2);
+    set(n.exG.gain, 0.12 + 0.25*throttle);
+    set(n.subG.gain, 0.35 + 0.25*lump);
+    set(n.engOut.gain, on ? (0.22 + r*0.30 + throttle*0.12) : 0, on?T:0.25);
+    const sq = running ? clamp(wr/18,0,1) : 0;
+    set(n.sqBP1.frequency, 1800 + sq*700 + Math.sin(t*9)*120);
+    set(n.sqBP2.frequency, 3000 + sq*600 + Math.sin(t*6.3)*180);
+    set(n.sqG.gain, sq*0.9, 0.05);
+    set(n.sqTG.gain, sq*0.035, 0.05);
+    set(n.hsG.gain, sq*0.12, 0.05);
+    const wb = (on && this.blower) ? 1 : 0;
+    set(n.wh.frequency, rpm/60*20); set(n.whBP.frequency, rpm/60*20);
+    set(n.wh2.frequency, rpm/60*40);
+    set(n.whG.gain, wb*(0.04 + 0.16*r*(0.4+0.6*throttle)));
+    set(n.wh2G.gain, wb*(0.01 + 0.03*r*throttle));
+  },
+  burst(dur, f0, f1, vol, type){   // filtered noise one-shot
+    const a=this.ctx, t=a.currentTime;
+    const s=a.createBufferSource(); s.buffer=this.noiseBuf;
+    const f=a.createBiquadFilter(); f.type=type||'lowpass'; f.frequency.setValueAtTime(f0,t); f.frequency.exponentialRampToValueAtTime(f1,t+dur);
+    const g=a.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+    s.connect(f); f.connect(g); g.connect(this.n.master); s.start(t, Math.random()); s.stop(t+dur+0.05);
+  },
+  thump(f0,f1,dur,vol){
+    const a=this.ctx, t=a.currentTime, o=a.createOscillator(), g=a.createGain();
+    o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+    o.connect(g); g.connect(this.n.master); o.start(t); o.stop(t+dur+0.05);
+  },
+  cough(){
+    if (!this.ok) return;
+    const t=this.ctx.currentTime, g=this.n.cough.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(1,t); g.linearRampToValueAtTime(0.05,t+0.03);
+    g.setValueAtTime(0.05,t+rand(0.06,0.14)); g.linearRampToValueAtTime(1,t+0.22);
+    this.burst(0.12, 900, 200, 0.5); this.thump(70,35,0.12,0.5);
+  },
+  stall(){
+    if (!this.ok) return;
+    this.engineOn=false;
+    const t=this.ctx.currentTime;
+    [this.n.o1,this.n.o2,this.n.o3,this.n.sub].forEach(o=>{ o.frequency.cancelScheduledValues(t); o.frequency.setTargetAtTime(8,t,0.25); });
+    this.cough(); setTimeout(()=>{ if(this.ok){ this.burst(0.25,500,100,0.6); this.thump(55,25,0.3,0.7);} },450);
+  },
+  start(blower){
+    if (!this.ok) return;
+    this.blower=!!blower; this.engineOn=true;
+    this.burst(0.15,1200,300,0.3); this.thump(90,40,0.2,0.6);
+  },
+  bang(){
+    if (!this.ok) return;
+    this.burst(0.9, 7000, 120, 1.6);
+    this.burst(1.6, 6000, 1500, 0.35, 'highpass');
+    this.thump(110, 28, 0.6, 1.4);
+  },
+  idle(){ /* engine keeps idling in menus */ }
+};
+
+// ---------------------------------------------------------------- particles
+let smoke = [], debris = [];
+const MAX_SMOKE = 450;
+function addSmoke(x,y,vx,vy,r0,gr,life,a,spr){
+  if (smoke.length >= MAX_SMOKE) smoke.shift();
+  smoke.push({x,y,vx,vy,r:r0,gr,life:0,max:life,a,spr:spr||(Math.random()<0.5?smokeSpr:smokeSpr2),rot:rand(0,TAU)});
+}
+function updParticles(dt){
+  for (let i=smoke.length-1;i>=0;i--){
+    const p=smoke[i]; p.life+=dt; if (p.life>=p.max){ smoke.splice(i,1); continue; }
+    const k=Math.exp(-dt*1.6); p.vx*=k; p.vy*=k; p.vx += 6*dt; p.vy -= 3*dt;   // light breeze
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.gr*dt*(1-p.life/p.max*0.6);
+  }
+  for (let i=debris.length-1;i>=0;i--){
+    const p=debris[i]; p.life+=dt; if (p.life>=p.max){ debris.splice(i,1); continue; }
+    const k=Math.exp(-dt*3); p.vx*=k; p.vy*=k; p.x+=p.vx*dt; p.y+=p.vy*dt; p.a+=p.va*dt;
+  }
+}
+function drawParticles(c){
+  for (const p of smoke){
+    const f=p.life/p.max, al=p.a*(f<0.08? f/0.08 : Math.pow(1-f,1.3));
+    if (al<=0.005) continue;
+    c.globalAlpha=al; c.drawImage(p.spr, p.x-p.r, p.y-p.r, p.r*2, p.r*2);
+  }
+  c.globalAlpha=1;
+  for (const p of debris){
+    c.save(); c.translate(p.x,p.y); c.rotate(p.a); c.globalAlpha=1-p.life/p.max;
+    c.fillStyle=p.col; c.fillRect(-p.s,-p.s*0.5,p.s*2,p.s); c.restore();
+  }
+  c.globalAlpha=1;
+}
+
+// ---------------------------------------------------------------- game state
+const theta0 = -Math.PI/2;
+const G = { state:'menu', carId:'perus', laps:1, s:{r:0.2,v:0,wear:0,prog:0,slip:0,wr:0},
+  cd:0, lastCd:0, runT:0, postT:0, endT:0, stallTimer:0, warn:false, blown:false, bonus:false, finished:false,
+  finishWear:0, fail:null, shake:0, flash:0, drift:0, spin:0, emitAcc:[0,0], engineOn:true, frames:0 };
+let lastRear = null;
+const pointers = new Set(); let keyHold = false;
+const isHolding = () => pointers.size>0 || keyHold;
+const car = () => CARS[G.carId];
+
+function pose(){
+  const th = theta0 + G.s.prog*G.laps*TAU;
+  const jit = (G.state==='run'||G.state==='post') && !G.blown ? G.s.slip*1.2 : 0;
+  return { x: cx + R*Math.cos(th) + rand(-jit,jit), y: cy + R*Math.sin(th) + rand(-jit,jit), ang: th + Math.PI/2 + G.drift, th };
+}
+function toWorld(p,lx,ly){ const c=Math.cos(p.ang), s=Math.sin(p.ang); return [p.x+lx*c-ly*s, p.y+lx*s+ly*c]; }
+function rearWheels(p){ return [toWorld(p,-CL*0.29,-CWd*0.47), toWorld(p,-CL*0.29,CWd*0.47)]; }
+
+const el = { hud:$('#hud'), start:$('#startScreen'), res:$('#resultScreen'), big:$('#bigmsg'), warn:$('#warn'), hint:$('#hint'),
+  tireFill:$('#tireFill'), tireTxt:$('#tireTxt'), wearTxt:$('#wearTxt'), lapTxt:$('#lapTxt'), progFill:$('#progFill') };
+function showMsg(html, cls){ el.big.className=''; void el.big.offsetWidth; el.big.innerHTML=html; el.big.className=cls; }
+const txtCache = {};
+function setTxt(k, node, v){ if (txtCache[k]!==v){ txtCache[k]=v; node.textContent=v; } }
+function setStyle(k, node, prop, v){ if (txtCache[k]!==v){ txtCache[k]=v; node.style[prop]=v; } }
+
+function newRun(){
+  G.s = { r:0.2, v:0, wear:0, prog:0, slip:0, wr:0 };
+  G.state='countdown'; G.cd=3; G.lastCd=0; G.runT=0; G.postT=0; G.endT=0; G.stallTimer=0;
+  G.warn=false; G.blown=false; G.bonus=false; G.finished=false; G.finishWear=0; G.fail=null; G.drift=0; G.emitAcc=[0,0];
+  G.engineOn=true; smoke=[]; debris=[]; lastRear=null;
+  mctx.clearRect(0,0,W,H);
+  el.start.classList.add('hidden'); el.res.classList.add('hidden'); el.hud.classList.remove('hidden');
+  Snd.unlock(); Snd.start(car().blower);
+}
+
+function blowout(bonus){
+  const s=G.s, p=pose();
+  G.blown=true; G.bonus=bonus; s.wear=100; G.state='end'; G.endT=0; G.warn=false;
+  if (!bonus && !G.finished) G.fail='blow';
+  G.flash=1; G.shake=bonus?16:11;
+  Snd.bang();
+  try{ navigator.vibrate && navigator.vibrate(bonus?[90,40,160]:[120]); }catch(e){}
+  showMsg(bonus ? 'PAM!<small>PERFECT BURNOUT! ×2</small>' : 'PAM!<small>Renkaat räjähtivät ennen maalia!</small>', 'bang');
+  for (const [wx,wy] of rearWheels(p)){
+    for (let i=0;i<26;i++){ const a=rand(0,TAU), sp=rand(30,160);
+      addSmoke(wx,wy,Math.cos(a)*sp,Math.sin(a)*sp,CWd*rand(0.5,1),CWd*rand(2,4),rand(1.8,3.4),rand(0.35,0.6)); }
+    for (let i=0;i<16;i++){ const a=rand(0,TAU), sp=rand(120,380);
+      debris.push({x:wx,y:wy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,a:rand(0,TAU),va:rand(-12,12),s:rand(2,5),life:0,max:rand(0.6,1.3),col:Math.random()<0.8?'#111':'#555'}); }
+  }
+}
+function stallOut(){
+  G.state='end'; G.endT=0; G.fail='stall'; G.engineOn=false; G.warn=false;
+  Snd.stall(); showMsg('MOOTTORI<br>SAMMUI!', 'hold');
+  const p=pose(), [ex,ey]=toWorld(p,-CL*0.55,CWd*0.25);
+  for (let i=0;i<8;i++) addSmoke(ex,ey,rand(-20,20),rand(-20,20),CWd*0.3,CWd*1.2,rand(1,1.8),0.5,darkSpr);
+}
+function finishRun(){ G.state='end'; G.endT=0; }
+
+function stepRun(dt){
+  const s=G.s, c=car();
+  const hold = isHolding() && (G.state==='run'||G.state==='post') && !G.blown && G.engineOn;
+  const w0 = s.wear;
+  physStep(s, hold, c, dt, G.laps, G.finished);
+  if (G.state==='end' && !G.blown) s.wear = w0;       // run is over: freeze tire wear
+  if (!G.engineOn){ s.r=Math.max(0,s.r-dt*1.5); s.slip=0; s.wr=0; }
+  if (G.blown){ s.v=Math.max(0,s.v-0.9*dt); s.wear=100; }
+  if (G.state==='run'){
+    G.runT+=dt;
+    if (s.prog>=1){ G.finished=true; G.finishWear=s.wear; G.state='post'; G.postT=0; G.warn=false;
+      showMsg('MAALI!<small>Kaasu pohjaan – räjäytä renkaat!</small>','show'); }
+    else if (s.wear>=100) blowout(false);
+    else {
+      G.warn = G.runT>0.8 && s.r < c.warnR;
+      if (G.runT>2 && s.r < c.stallR) G.stallTimer+=dt; else G.stallTimer=Math.max(0,G.stallTimer-2*dt);
+      if (G.stallTimer > c.stallT) stallOut();
+    }
+  } else if (G.state==='post'){
+    G.postT+=dt;
+    if (s.wear>=100) blowout(G.postT<=BONUS_WINDOW);
+    else if (G.postT>BONUS_WINDOW) finishRun();
+  } else if (G.state==='end'){
+    G.endT+=dt;
+    if (G.endT > (G.blown ? 2.2 : 1.5)) showResults();
+  }
+}
+
+function grade(w){
+  if (w>=98) return ['LOISTAVA!','Kumit lähes loppuun – täydellistä polttoa!'];
+  if (w>=90) return ['HYVÄ!','Hienoa – kumi paloi kunnolla.'];
+  if (w>=70) return ['OK!','Kumi palaa. Vielä vähän hitaammin ja enemmän sutimista.'];
+  return ['LIIAN KOVAA VAUHTIA','Renkaissa on vielä paljon kumia. Nosta sormea välillä, niin vauhti hiipuu ja renkaat sutivat.'];
+}
+function showResults(){
+  G.state='result'; G.warn=false;
+  const s=G.s, c=car(); let title, sub, pts=0, bonusTxt='', wearVal;
+  if (G.fail==='stall'){ title='MOOTTORI SAMMUI!'; sub='Kierrokset putosivat liian alas. Kun moottori yskii, anna kaasua!'; wearVal=s.wear; }
+  else if (G.fail==='blow'){ title='RENKAAT RÄJÄHTIVÄT!'; sub=`Liian aikaisin – matkaa oli vielä jäljellä ${Math.max(1,Math.ceil((1-s.prog)*100))} %. Aja välillä reippaammin.`; wearVal=100; }
+  else {
+    wearVal=G.finishWear; [title,sub]=grade(wearVal); pts=Math.round(wearVal*10);
+    if (G.bonus){ pts*=2; bonusTxt='💥 PERFECT BURNOUT! Tuplapisteet ×2'; }
+    else if (wearVal>=80) sub += ' Vinkki: pidä kaasu pohjassa maalin jälkeen – räjähdys sekunnin sisällä = tuplapisteet!';
+  }
+  const key = LS+c.id+'.'+G.laps; let best=0; try{ best=+localStorage.getItem(key)||0; }catch(e){}
+  let bestTxt;
+  if (pts>0 && pts>best){ try{ localStorage.setItem(key, String(pts)); }catch(e){} bestTxt = best>0 ? `🏆 UUSI ENNÄTYS! (vanha ${best})` : '🏆 Ensimmäinen ennätys!'; best=pts; }
+  else bestTxt = `Ennätys (${c.name}, ${G.laps} kierr.): ${best||'–'}`;
+  $('#resTitle').textContent=title; $('#resSub').textContent=sub;
+  $('#resWear').innerHTML = `${Math.floor(Math.min(100,wearVal))} %<small>${G.fail? 'renkaiden kuluma' : 'renkaiden kuluma maalissa'}</small>`;
+  $('#resPts').textContent = `${pts} pistettä`; $('#resBonus').textContent=bonusTxt; $('#resBest').textContent=bestTxt;
+  el.res.classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------- update
+function update(dt){
+  const s=G.s, c=car(), hold=isHolding();
+  G.frames++;
+  if (G.state==='countdown'){
+    G.cd-=dt;
+    if (hold) s.r=Math.min(1,s.r+c.rise*dt); else s.r=Math.max(0.2,s.r-c.fall*dt);
+    s.slip=0; s.wr=0;
+    const n=Math.ceil(G.cd);
+    if (n!==G.lastCd && n>0){ G.lastCd=n; showMsg(String(n),'show'); Snd.ok && Snd.thump(220,200,0.08,0.25); }
+    if (G.cd<=0){ G.state='run'; showMsg('POLTA!','show'); Snd.ok && Snd.thump(440,430,0.15,0.3); }
+  } else if (G.state==='run'||G.state==='post'||G.state==='end'){
+    const n=Math.max(1,Math.ceil(dt/0.008));
+    for (let i=0;i<n && (G.state==='run'||G.state==='post'||G.state==='end');i++) stepRun(dt/n);
+  } else {
+    // menu / result: idle
+    if (G.engineOn) s.r = lerp(s.r, 0.2, 1-Math.exp(-dt*3)); s.slip=0; s.wr=0;
+  }
+  const burning = (G.state==='run'||G.state==='post') && !G.blown;
+  G.drift = lerp(G.drift, burning ? clamp(s.slip*0.6,0,0.45) : G.drift*0.9, 1-Math.exp(-dt*4));
+  if (!G.blown && G.engineOn) G.spin += (s.slip*25 + s.v*6)*dt;
+  // smoke + marks
+  const p = pose();
+  if (burning && s.wr>0.4){
+    const rate=Math.min(90, 6 + s.wr*4), rw=rearWheels(p), bx=-Math.cos(p.ang), by=-Math.sin(p.ang);
+    for (let i=0;i<2;i++){
+      G.emitAcc[i]+=rate*dt;
+      while (G.emitAcc[i]>=1){ G.emitAcc[i]--;
+        const sp=rand(20,60)*(0.5+s.slip);
+        addSmoke(rw[i][0]+rand(-3,3), rw[i][1]+rand(-3,3), bx*sp+rand(-18,18), by*sp+rand(-18,18),
+          CWd*rand(0.35,0.6), CWd*rand(1.3,2.3)*(0.7+s.wr/20), rand(1.6,3.0), rand(0.3,0.55)*clamp(0.5+s.wr/15,0,1));
+      }
+    }
+  }
+  if (burning && s.wr>0.6){
+    const rw=rearWheels(p);
+    if (lastRear){
+      mctx.strokeStyle=`rgba(12,12,12,${clamp(0.07+s.wr/32,0,0.6).toFixed(3)})`; mctx.lineWidth=CWd*0.24;
+      for (let i=0;i<2;i++){ mctx.beginPath(); mctx.moveTo(lastRear[i][0],lastRear[i][1]); mctx.lineTo(rw[i][0],rw[i][1]); mctx.stroke(); }
+    }
+    lastRear=rw;
+  } else lastRear=null;
+  // sparks from rims
+  if (G.blown && s.v>0.05 && Math.random()<0.6){
+    const rw=rearWheels(p)[Math.random()<0.5?0:1];
+    debris.push({x:rw[0],y:rw[1],vx:rand(-90,90),vy:rand(-90,90),a:0,va:0,s:1.5,life:0,max:rand(0.15,0.35),col:Math.random()<0.5?'#ffd23a':'#ff7a1a'});
+  }
+  // stall warning: coughs + dark puffs
+  if (G.warn && Math.random() < dt*5){
+    Snd.cough(); G.shake=Math.max(G.shake,2.5);
+    const [ex,ey]=toWorld(p,-CL*0.55,CWd*0.25);
+    for (let i=0;i<3;i++) addSmoke(ex,ey,rand(-25,25),rand(-25,25),CWd*0.2,CWd*0.9,rand(0.6,1.1),0.55,darkSpr);
+  }
+  updParticles(dt);
+  G.shake = Math.max(0, G.shake - dt*25); G.flash = Math.max(0, G.flash - dt*2.2);
+  // audio
+  Snd.engineOn = G.engineOn;
+  Snd.update(s.r, (hold && (G.state==='run'||G.state==='post'||G.state==='countdown') && G.engineOn) ? 1 : 0, s.wr, burning);
+  // HUD
+  if (G.state!=='menu'){
+    const cond = 100-Math.min(100,s.wear);
+    setStyle('tf', el.tireFill, 'width', cond.toFixed(1)+'%');
+    setStyle('tc', el.tireFill, 'background', cond>50?'#3ad46a':cond>25?'#ffd23a':cond>8?'#ff8a1a':'#ff3b30');
+    setTxt('tt', el.tireTxt, Math.max(0,Math.ceil(cond))+' %');
+    setTxt('wt', el.wearTxt, 'Kuluma '+Math.floor(Math.min(100,s.wear))+' %');
+    setTxt('lt', el.lapTxt, G.finished ? 'MAALI' : `Kierros ${Math.min(G.laps, Math.floor(s.prog*G.laps)+1)}/${G.laps}`);
+    setStyle('pf', el.progFill, 'width', (clamp(s.prog,0,1)*100).toFixed(1)+'%');
+    setStyle('wn', el.warn, 'display', G.warn ? 'block' : 'none');
+    let h='';
+    if (G.state==='countdown') h='Valmiina… voit jo kaasutella!';
+    else if (G.state==='run') h = G.runT<5 ? 'Pidä sormi ruudulla = kaasu · nosta = kierrokset laskevat' : (s.wear>85 ? 'Varo! Renkaat kohta lopussa' : '');
+    else if (G.state==='post') h='KAASU POHJAAN!';
+    setTxt('hn', el.hint, h);
+  }
+}
+
+// ---------------------------------------------------------------- render
+function drawTach(){
+  const c=tctx, sz=86, x=43, y=45, r=37, a0=Math.PI*0.75, a1=Math.PI*2.25, cr=car();
+  c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,sz,sz);
+  const fr = v => a0 + (v/7000)*(a1-a0), rpmOf = rr0 => 700 + rr0*6300;
+  c.fillStyle='rgba(12,12,14,.88)'; c.beginPath(); c.arc(x,y,r+3,0,TAU); c.fill();
+  c.strokeStyle='#c9c9cf'; c.lineWidth=2; c.stroke();
+  c.lineWidth=5;
+  c.strokeStyle='rgba(255,140,0,.85)'; c.beginPath(); c.arc(x,y,r-5,fr(0),fr(rpmOf(cr.warnR))); c.stroke();
+  c.strokeStyle='#ff2d2d'; c.beginPath(); c.arc(x,y,r-5,fr(6000),fr(7000)); c.stroke();
+  c.strokeStyle='#ddd'; c.lineWidth=1.5; c.fillStyle='#ddd'; c.font='bold 9px system-ui,Arial'; c.textAlign='center'; c.textBaseline='middle';
+  for (let k=0;k<=7;k++){ const a=fr(k*1000); c.beginPath(); c.moveTo(x+Math.cos(a)*(r-9),y+Math.sin(a)*(r-9)); c.lineTo(x+Math.cos(a)*(r-2),y+Math.sin(a)*(r-2)); c.stroke();
+    c.fillText(String(k), x+Math.cos(a)*(r-16), y+Math.sin(a)*(r-16)); }
+  c.font='bold 8px system-ui,Arial'; c.fillStyle='#aaa'; c.fillText('RPM ×1000', x, y+20);
+  const a=fr(rpmOf(G.s.r));
+  c.strokeStyle= G.warn ? '#ff3b30' : '#ff8a1a'; c.lineWidth=3; c.beginPath(); c.moveTo(x,y); c.lineTo(x+Math.cos(a)*(r-6),y+Math.sin(a)*(r-6)); c.stroke();
+  c.fillStyle='#eee'; c.beginPath(); c.arc(x,y,4,0,TAU); c.fill();
+}
+function render(){
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#2e2f32'; ctx.fillRect(0,0,cv.width,cv.height);
+  const sx=G.shake>0?rand(-1,1)*G.shake:0, sy=G.shake>0?rand(-1,1)*G.shake:0;
+  ctx.setTransform(dpr,0,0,dpr,sx*dpr,sy*dpr);
+  ctx.drawImage(bg,0,0,W,H); ctx.drawImage(marks,0,0,W,H);
+  if (G.state!=='menu'){
+    ctx.strokeStyle='rgba(159,211,255,.55)'; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx,cy,R-lane/2-9, theta0, theta0+TAU*clamp(G.s.prog,0,1)+0.0001); ctx.stroke();
+  }
+  const p=pose();
+  drawCar(ctx,p.x,p.y,p.ang,car(),CL,CWd,{spin:G.spin, blown:G.blown, brake: G.finished || G.blown || (G.state==='run' && !isHolding())});
+  drawParticles(ctx);
+  if (G.flash>0){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=`rgba(255,250,220,${(G.flash*0.85).toFixed(3)})`; ctx.fillRect(0,0,cv.width,cv.height); }
+  if (G.state!=='menu') drawTach();
+}
+
+let lastT = performance.now();
+function frame(now){
+  let dt=(now-lastT)/1000; lastT=now; if (!(dt>0)) dt=0.016; dt=Math.min(dt,0.05);
+  try { update(dt); render(); } catch(e){ console.error(e); }
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- input
+const overlayOpen = () => !el.start.classList.contains('hidden') || !el.res.classList.contains('hidden');
+window.addEventListener('pointerdown', e => {
+  Snd.unlock();
+  if (e.target.closest('button') || overlayOpen()) return;
+  pointers.add(e.pointerId); e.preventDefault();
+}, {passive:false});
+['pointerup','pointercancel'].forEach(ev => window.addEventListener(ev, e => pointers.delete(e.pointerId)));
+window.addEventListener('touchend', () => Snd.unlock(), {passive:true});
+cv.addEventListener('touchstart', e => e.preventDefault(), {passive:false});
+document.addEventListener('touchmove', e => { if (!e.target.closest('.overlay')) e.preventDefault(); }, {passive:false});
+['gesturestart','gesturechange','dblclick','contextmenu'].forEach(ev => document.addEventListener(ev, e => e.preventDefault(), {passive:false}));
+window.addEventListener('blur', () => { pointers.clear(); keyHold=false; });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden){ pointers.clear(); keyHold=false; if (Snd.ctx) Snd.ctx.suspend(); }
+  else if (Snd.ctx) Snd.ctx.resume();
+});
+window.addEventListener('keydown', e => {
+  if (e.code==='Space' || e.code==='Enter'){
+    e.preventDefault(); Snd.unlock();
+    if (!e.repeat && G.state==='menu' && !el.start.classList.contains('hidden')){ newRun(); return; }
+    if (!e.repeat && G.state==='result'){ newRun(); return; }
+    if (e.code==='Space') keyHold=true;
+  }
+});
+window.addEventListener('keyup', e => { if (e.code==='Space') keyHold=false; });
+
+// ---------------------------------------------------------------- menu
+function refreshBest(){
+  let b=0; try{ b=+localStorage.getItem(LS+G.carId+'.'+G.laps)||0; }catch(e){}
+  $('#bestTxt').textContent = `Ennätys (${car().name}, ${G.laps} kierr.): ${b||'–'}`;
+}
+document.querySelectorAll('.car').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.car').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  G.carId=b.dataset.car; refreshBest(); Snd.unlock();
+  if (Snd.ok){ Snd.blower = car().blower; Snd.thump(80,40,0.15,0.4); }
+}));
+document.querySelectorAll('.seg').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.seg').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  G.laps=+b.dataset.laps; refreshBest();
+}));
+$('#btnStart').addEventListener('click', () => { Snd.unlock(); newRun(); });
+$('#btnAgain').addEventListener('click', () => { Snd.unlock(); newRun(); });
+$('#btnRestart').addEventListener('click', () => { Snd.unlock(); newRun(); });
+$('#btnMenu').addEventListener('click', () => {
+  el.res.classList.add('hidden'); el.hud.classList.add('hidden'); el.start.classList.remove('hidden');
+  G.state='menu'; G.s={r:0.2,v:0,wear:0,prog:0,slip:0,wr:0}; G.blown=false; G.finished=false; G.drift=0; G.engineOn=true;
+  smoke=[]; debris=[]; refreshBest(); drawPreviews();
+});
+function drawPreviews(){
+  document.querySelectorAll('canvas[data-prev]').forEach(c => {
+    const w=c.clientWidth||150, h=c.clientHeight||70; c.width=w*dpr; c.height=h*dpr;
+    const x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,h);
+    x.fillStyle='#333438'; rr(x,0,0,w,h,10); x.fill();
+    const L=Math.min(w*0.78, h*1.9);
+    drawCar(x, w/2, h/2, 0, CARS[c.dataset.prev], L, L*0.42, {});
+  });
+}
+
+window.addEventListener('resize', () => { layout(); drawPreviews(); });
+window.addEventListener('orientationchange', () => setTimeout(() => { layout(); drawPreviews(); }, 200));
+layout(); drawPreviews(); refreshBest();
+requestAnimationFrame(frame);
+
+// test / debug hook
+window.__burnis = { G, CARS, physStep, newRun, Snd, smokeCount: () => smoke.length };
+})();
+</script>
+</body>
+</html>
