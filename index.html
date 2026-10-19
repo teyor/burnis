@@ -97,6 +97,17 @@
   .seg.wide{width:auto;padding:0 12px}
   .row{margin-top:10px}
   #cargoTxt{color:#ffcf5a;font-weight:800}
+  /* 9 cars: compact start screen so the 3x3 grid fits a phone */
+  #startScreen{justify-content:safe center;overflow-y:auto}
+  #startScreen h1.logo{font-size:50px}
+  #startScreen .tag{margin:2px 0 8px;font-size:14px}
+  .cars{gap:6px}
+  .car{padding:3px 3px 4px;border-radius:12px}
+  .car canvas{height:34px}
+  .car .nm{font-size:12px}
+  #carInfo{margin-top:6px;padding:6px 9px;font-size:12px;min-height:54px}
+  #startScreen .row{margin-top:7px}
+  #startScreen .big{height:54px;margin-top:10px}
   #radio{position:absolute;left:50%;top:31%;transform:translateX(-50%);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;font-weight:700;
     color:#b6ffb0;background:#0b1f0ee6;border:2px solid #4c8f4a;border-radius:10px;padding:8px 12px;white-space:nowrap;text-shadow:0 0 6px #6f6;animation:crackle .12s steps(2) infinite}
   #radio i{opacity:.6;font-style:normal}
@@ -239,7 +250,25 @@ const CARS = {
              body:'#f3f0ea', bodyDark:'#a9a49a', roof:'#7a1420', whitewall:true,
              snd:{ cyl:8, o2r:0.5, o3r:0.504, g2:0.34, g3:0.30, sub:1.55, lope:0.9, lp:150, lpR:1700, rasp:0.75, vol:1.15 },
              desc:'Hääpari takapenkillä, peltipurkit narussa. Valtava, pehmeä ja kelluva – liukuu leveästi. Jokainen irtoava purkki +35.',
-             stats:[['Teho','●●●'],['Pehmeys','●●●'],['Purkit','5 kpl']] }
+             stats:[['Teho','●●●'],['Pehmeys','●●●'],['Purkit','5 kpl']] },
+  cuda:    { id:'cuda', name:"'70 Hemi Cuda", short:'Hemi Cuda', shape:'cuda', len:1.04, wid:1.0, rearX:-0.29, hemi:true, redSmoke:true, popOnLift:true,
+             idle:0.16, rise:1.7, fall:1.3, A:0.47, D:0.10, Dc:0.03, Brk:0.20, W:21, P:1.6, T1:8, stallR:0.30, stallT:0.9, warnR:0.38,
+             body:'#6a2d9c', bodyDark:'#2c1045', roof:'#141414', whitewall:false,
+             snd:{ cyl:8, o2r:0.5, o3r:0.496, g2:0.38, g3:0.32, sub:1.9, lope:1.4, lp:120, lpR:1400, rasp:0.8, vol:1.25 },
+             desc:'Iso-blokki Hemi ja shaker-kauha. Polttaa PUNAISTA savua, paukkuu kun kaasu nousee. Pitkä tasainen kova kierros = Hemi-jyrinä: show-mittari täyttyy nopeammin.',
+             stats:[['Teho','●●●'],['Jyrinä','●●●'],['Savu','punainen']] },
+  hotrod:  { id:'hotrod', name:"'32 Ford hot rod", short:"'32 hot rod", shape:'hotrod', len:0.9, wid:0.92, rearX:-0.30, luck:true, blower:true,
+             idle:0.17, rise:2.6, fall:2.0, A:0.62, D:0.10, Dc:0.03, Brk:0.20, W:29, P:1.6, T1:8, stallR:0.30, stallT:0.8, warnR:0.38,
+             body:'#c41e1e', bodyDark:'#6a0c0c', roof:'#111', whitewall:false,
+             snd:{ cyl:8, o2r:0.5, o3r:0.512, g2:0.34, g3:0.30, sub:1.2, lope:2.4, lp:200, lpR:2500, rasp:1.35, vol:1.05, lumpy:1 },
+             desc:'Avokori, ahdettu flathead ja sivuputket. Kevyt ja raju – pyörähtää herkästi ja syö kumia. Tuuri: välillä nikottelee, välillä TEHOPIIKKI (+bonus)!',
+             stats:[['Teho','●●●'],['Kulutus','●●●'],['Tuuri','?!']] },
+  monster: { id:'monster', name:'Monsteriauto Mörkö', short:'Monsteri', shape:'monster', len:1.25, wid:1.3, rearX:-0.30, monster:true,
+             idle:0.17, rise:1.5, fall:1.2, A:0.40, D:0.12, Dc:0.03, Brk:0.22, W:15, P:1.6, T1:8, stallR:0.30, stallT:0.9, warnR:0.38,
+             body:'#2f9a3a', bodyDark:'#13501a', roof:'#1a1a1a', whitewall:false,
+             snd:{ cyl:8, o2r:0.5, o3r:0.503, g2:0.32, g3:0.28, sub:1.5, lope:0.9, lp:160, lpR:1700, rasp:1.1, vol:1.15 },
+             desc:'Jättirenkaat kuluvat hitaasti mutta heittävät isoja kumipaloja. Pitkä kaasu hitaalla = KEULINTA (tuplapisteet) – liian pitkään ja se kaatuu! Murskaa esteet alleen.',
+             stats:[['Renkaat','●●●'],['Keulinta','×2'],['Murskaa','●●●']] }
 };
 const TRACKS = {
   circle: { id:'circle', name:'Ympyrä', Tm:1.0, Wm:1.0 },
@@ -260,6 +289,7 @@ function physStep(s, hold, car, dt, laps, finished, trk){
     A *= 1 + 0.3*s.boost;
     wm = 1 + clamp((s.boost - 0.6)/0.35, 0, 1);    // full boost = ~2x tire wear
   }
+  if (s.pm) A *= s.pm;                             // hot rod luck: hiccup / power surge
   if (hold) s.r = s.r > rmax ? Math.max(rmax, s.r - 2*dt) : Math.min(rmax, s.r + rise*dt);
   else { const t = car.idle + 0.85*s.v; s.r = s.r > t ? Math.max(t, s.r - car.fall*dt) : Math.min(t, s.r + car.fall*dt); }
   s.slip = Math.max(0, s.r - s.v);                 // wheelspin
@@ -479,6 +509,9 @@ function drawCar(c, x, y, ang, car, L0, w0, o){
   else if (car.shape==='pickup') drawPickup(c,car,L,w,o);
   else if (car.shape==='wagon') drawWagon(c,car,L,w,o);
   else if (car.shape==='caddy') drawCaddy(c,car,L,w,o);
+  else if (car.shape==='cuda') drawCuda(c,car,L,w,o);
+  else if (car.shape==='hotrod') drawHotrod(c,car,L,w,o);
+  else if (car.shape==='monster') drawMonster(c,car,L,w,o);
   // cargo on board (local coords)
   if (o.cargo) for (const it of o.cargo){ if (!it.on) continue;
     c.save(); c.translate(it.lx*L + (it.jx||0), it.ly*w + (it.jy||0)); c.rotate(it.rot + (it.jr||0));
@@ -786,7 +819,7 @@ const Snd = {
     set(n.sub.frequency, P.cyl===8 ? fire/4 : fire/3);
     set(n.lfo.frequency, P.cyl===8 ? rpm/120 : rpm/40);
     set(n.lfoG.gain, (0.15 + 0.35*lump)*P.lope);
-    set(n.am.gain, 0.65);
+    set(n.am.gain, P.lumpy ? 0.65*(1 - P.lumpy*(Math.random() < 0.25 ? rand(0.3,0.6) : rand(0,0.12))) : 0.65, P.lumpy ? 0.012 : T);
     set(n.lp.frequency, P.lp + r*P.lpR + throttle*500);
     set(n.exBP.frequency, fire*(P.cyl===8?2.2:3.1));
     set(n.exG.gain, (0.12 + 0.25*throttle)*P.rasp);
@@ -855,6 +888,7 @@ const Snd = {
     for (let i=0;i<7;i++) this.burst(rand(0.03,0.09), rand(1500,3500), rand(600,1200), rand(0.15,0.35), 'bandpass', i*0.08+rand(0,0.04));
     this.burst(0.6, 2500, 1800, 0.08, 'bandpass', 0.05);
   },
+  backfire(v){ if (!this.ok) return; v=v||1; this.burst(0.12, 3500, 200, 0.9*v); this.thump(120,40,0.14,0.9*v); },
   exhaustPop(){ if (!this.ok) return; this.burst(0.07, 2500, 300, 0.45); this.thump(160,60,0.08,0.4); },
   overheat(){ if (!this.ok) return; this.burst(0.9, 5000, 2000, 0.3, 'highpass'); this.cough(); },
   clank(){ if (!this.ok) return; const a=this.ctx, t=a.currentTime, o=a.createOscillator(), g=a.createGain(); o.type='square';
@@ -1066,6 +1100,7 @@ function newRun(){
   G.engineOn=true; smoke=[]; debris=[]; lastRear=null; G.objs=[]; G.floats=[]; G.cargo=makeCargo(car()); G.cargoCount=0; G.cargoPts=0;
   G.cans=makeCans(car()); G.lights=false; G.lightHold=0; G.flashPh=0; G.radioT=0; G.radioCd=0; G.noBouquet=false; G.prevOh=0; G.runId++;
   if (isFree()) fsReset();
+  gimReset();
   fsUiMode();
   el.stamp.classList.remove('show'); el.radio.style.display='none'; txtCache.rd='none'; el.boostG.classList.toggle('hidden', !car().boost);
   mctx.clearRect(0,0,W,H);
@@ -1144,6 +1179,8 @@ function stepRun(dt){
   const hold = isHolding() && (G.state==='run'||G.state==='post') && !G.blown && G.engineOn;
   const w0 = s.wear;
   physStep(s, hold, c, dt, G.laps, G.finished, trk());
+  if ((G.state==='run'||G.state==='post') && !G.blown && G.engineOn) gimStep(s, hold, c, dt, false);
+  if (G.state==='end' && G.fail==='flip'){ s.v=Math.max(0,s.v-1.5*dt); s.slip=0; s.wr=0; }
   if (G.state==='end' && !G.blown) s.wear = w0;
   if (!G.engineOn){ s.r=Math.max(0,s.r-dt*1.5); s.slip=0; s.wr=0; }
   if (G.blown){ s.v=Math.max(0,s.v-0.9*dt); s.wear=100; }
@@ -1191,14 +1228,17 @@ function showResults(){
   if (isFree()) return fsResults();
   G.state='result'; G.warn=false;
   const s=G.s, c=car(); let title, sub, pts=0, bonusTxt='', wearVal, cargoTxt='';
-  if (G.fail==='stall'){ title='MOOTTORI SAMMUI!'; sub = c.id==='valiant' ? 'Valiantin kutonen sammuu herkästi – pidä kierrokset ylhäällä!' : 'Kierrokset putosivat liian alas. Kun moottori yskii, anna kaasua!'; wearVal=s.wear; }
+  if (G.fail==='flip'){ title='VOLTTI – HYLÄTTY!'; sub='Monsteri keuli liian pitkään ja kaatui katolleen. Nosta kaasua kun keula-mittari käy punaisella.'; wearVal=s.wear; }
+  else if (G.fail==='stall'){ title='MOOTTORI SAMMUI!'; sub = c.id==='valiant' ? 'Valiantin kutonen sammuu herkästi – pidä kierrokset ylhäällä!' : 'Kierrokset putosivat liian alas. Kun moottori yskii, anna kaasua!'; wearVal=s.wear; }
   else if (G.fail==='blow'){ title='RENKAAT RÄJÄHTIVÄT!'; sub=`Liian aikaisin – matkaa oli vielä jäljellä ${Math.max(1,Math.ceil((1-s.prog)*100))} %. Aja välillä reippaammin.`; wearVal=100; }
   else {
     wearVal=G.finishWear; [title,sub]=grade(wearVal); pts=Math.round(wearVal*10);
     if (G.bonus){ pts*=2; bonusTxt = c.police ? '🚓 KIINNI! Perfect Burnout – tuplapisteet ×2' : c.cargo==='cans' ? '💍 JUST MARRIED! Perfect Burnout – tuplapisteet ×2' : '💥 PERFECT BURNOUT! Tuplapisteet ×2'; }
     else if (wearVal>=80) sub += ' Vinkki: pidä kaasu pohjassa maalin jälkeen – räjähdys sekunnin sisällä = tuplapisteet!';
     pts += G.cargoPts;
+    if (G.gim && G.gim.pts > 0){ const gp=Math.round(G.gim.pts); pts += gp; }
   }
+  const gl = gimLines(false); if (gl.length) cargoTxt = gl[0] + (G.fail ? ' (bonus vain maaliin päästessä)' : '');
   if (c.cargo){
     const what = c.cargo==='hay' ? '🌾 Paaleja kyydistä' : c.cargo==='cans' ? '🥫 Peltipurkkeja irtosi' : '🧳 Tavaroita lensi';
     cargoTxt = G.fail ? `${what}: ${G.cargoCount} (bonus vain maaliin päästessä)` : `${what}: ${G.cargoCount} × ${CARGO_PTS[c.cargo]} = +${G.cargoPts}`;
@@ -1221,12 +1261,15 @@ const FSP = {
   valiant: { heat:1.25, wear:1.00, grip:1.05, turn:1.05 },
   pickup:  { heat:1.00, wear:1.00, grip:1.00, turn:0.95 },
   wagon:   { heat:1.00, wear:1.00, grip:1.00, turn:0.95 },
-  caddy:   { heat:0.70, wear:1.00, grip:0.72, turn:0.85 }
+  caddy:   { heat:0.70, wear:1.00, grip:0.72, turn:0.85 },
+  cuda:    { heat:0.95, wear:1.00, grip:0.98, turn:1.00 },
+  hotrod:  { heat:1.00, wear:1.05, grip:0.85, turn:1.30 },
+  monster: { heat:0.85, wear:0.85, grip:1.10, turn:0.85 }
 };
 const FS_VM = 4.2;          // top wheel speed, car lengths per second
 const FS_K = { wear:0.21, heat:0.026, cool:0.12, E:0.25, rimT:4.0, T0:0.30 };
 // 'Eat My Dust' dirt field: loose grip, slower tyre wear, hotter engine (dust clogs the radiator)
-const FS_DIRT = { grip:0.36, slipK:0.55, turn:0.8, trac:0.7, wear:0.9, heat:1.08, carHeat:{ super:0.62, wagon:0.86, pickup:0.9 }, fence:0.8, dustPts:18, dustBonus:150 };
+const FS_DIRT = { grip:0.36, slipK:0.55, turn:0.8, trac:0.7, wear:0.9, heat:1.08, carHeat:{ super:0.62, wagon:0.86, pickup:0.9, cuda:0.88 }, fence:0.8, dustPts:18, dustBonus:150 };
 function fsNew(){
   return { r:0.2, v:0, wear:0, prog:0, slip:0, wr:0, E:0, x:0, y:0, h:-Math.PI/2, vx:0, vy:0, w:0, u:0, lat:0, spd:0,
     T:FS_K.T0, holdT:0, blown:false, rimT:0, wrT:0, S:0, M:1, burnT:0, gap:9, rot:0, lastDonut:0, lastDir:0, tSince:99, slideT:0,
@@ -1249,6 +1292,7 @@ function fsPhys(s, hold, steer, c, dt, ar){
     A *= 1 + 0.3*s.boost;
     wm = 1 + clamp((s.boost - 0.6)/0.35, 0, 1);
   }
+  if (s.pm) A *= s.pm;
   const fx = Math.cos(s.h), fy = Math.sin(s.h), nx = -fy, ny = fx;
   let u = (s.vx*fx + s.vy*fy)/FS_VM, lat = (s.vx*nx + s.vy*ny)/FS_VM;
   // revs
@@ -1304,7 +1348,7 @@ function fsPhys(s, hold, steer, c, dt, ar){
     if (burning){ s.markLen += (spdN*FS_VM + 0.4*Math.abs(s.w))*dt; s.smokeAmt += Math.min(90, 6 + s.wr*4)*nW*dt; }
     if (s.wr > 3){ s.burnT += dt; s.gap = 0; } else { s.gap += dt; if (s.gap > 1.5) s.burnT = 0; }
     s.M = Math.min(5, 1 + Math.floor(s.burnT/5));
-    const M = s.M;
+    const M = s.M*(s.wh > 0.2 ? 2 : 1);   // monster wheelie = double points
     fsCover(s, c, ar, M, burning);
     if (burning) s.pts.smoke += Math.min(90, 6 + s.wr*4)*nW*dt*0.05*M;
     const donut = s.slip > 0.28 && Math.abs(s.w) > 1.3;
@@ -1344,7 +1388,7 @@ function fsPhys(s, hold, steer, c, dt, ar){
   }
   return out;
 }
-function fsTotal(s){ const p = s.pts; return Math.max(0, Math.round(p.style + p.marks + p.cover + p.smoke + p.tricks + p.chunks + p.rims + p.penalty + (p.dust||0))); }
+function fsTotal(s){ const p = s.pts; return Math.max(0, Math.round(p.style + p.marks + p.cover + p.smoke + p.tricks + p.chunks + p.rims + p.penalty + (p.dust||0) + (p.gim||0))); }
 // Coverage: a grid over the arena (cells ~0.11 car lengths ≈ 6 px). Fresh asphalt pays, repeat passes pay less and less.
 const FS_CELL = 0.11, FS_COVER_PTS = 2.4, FS_GAIN = [1, 0.3, 0.1, 0.04];
 function fsCover(s, c, ar, M, burning){
@@ -1500,7 +1544,7 @@ function fsSmokeSpr(wear){
   const q = wear/100 + rand(-0.1, 0.1);
   return q < 0.3 ? (Math.random() < 0.5 ? smokeSpr : smokeSpr2) : q < 0.5 ? smokeSpr2 : q < 0.7 ? greySpr : q < 0.88 ? dkSpr : blkSpr;
 }
-const dustSpr = [makeSprite(214,184,138), makeSprite(190,156,110), makeSprite(160,124,84)];
+const dustSpr = [makeSprite(178,142,98), makeSprite(152,118,78), makeSprite(126,96,62)];
 function fsEmitDust(w, s, c, p, bx, by){
   const spx = s.spd*FS_VM*CL, slow = 1 - clamp(spx/(1.3*CL), 0, 1), wd = G.wind || {x:0, y:0};
   const spread = 34 + 34*slow, back = rand(40,110)*(0.5 + s.slip)*(1 - 0.6*slow);
@@ -1516,14 +1560,14 @@ function fsEmitDust(w, s, c, p, bx, by){
 function fsEmitSmoke(w, s, c, p, bx, by){
   if (isDust()) return fsEmitDust(w, s, c, p, bx, by);
   const wf = clamp(s.wear/100, 0, 1), spx = s.spd*FS_VM*CL, slow = 1 - clamp(spx/(1.3*CL), 0, 1);
-  const spr = G.lights && Math.random() < 0.3 ? (Math.random() < 0.5 ? redSpr : blueSpr) : fsSmokeSpr(s.wear);
+  const spr = c.redSmoke ? pick(redSmk) : G.lights && Math.random() < 0.3 ? (Math.random() < 0.5 ? redSpr : blueSpr) : fsSmokeSpr(s.wear);
   const spread = 16 + 26*slow, back = rand(20,60)*(0.5 + s.slip)*(1 - slow);
   addSmoke(w[0] + rand(-3,3), w[1] + rand(-3,3), bx*back + s.vx*CL*0.12 + rand(-spread,spread), by*back + s.vy*CL*0.12 + rand(-spread,spread),
     CWd*rand(0.35,0.6), CWd*rand(1.3,2.3)*(0.7 + s.wr/20)*(c.markW ? 1.2 : 1)*(1 + 0.3*slow)/(1 + 0.9*wf),   // longer life, same final size
     rand(1.5,2.8)*(1 + 1.5*wf)*(1 + 0.4*slow), rand(0.3,0.55)*clamp(0.5 + s.wr/15, 0, 1)*(0.65 + 0.35*slow), spr);
   if (slow > 0.4 && Math.random() < 0.35*slow){   // standing burnout: the cloud rolls over the car
     addSmoke(p.x + rand(-CL*0.3, CL*0.3), p.y + rand(-CL*0.3, CL*0.3), rand(-14,14), rand(-14,14), CWd*rand(0.6,1), CWd*rand(1.4,2.2)/(1 + 0.8*wf),
-      rand(1.6,2.6)*(1 + 1.2*wf), rand(0.35,0.6)*slow, spr === redSpr || spr === blueSpr ? spr : fsSmokeSpr(s.wear)); }
+      rand(1.6,2.6)*(1 + 1.2*wf), rand(0.35,0.6)*slow, spr === redSpr || spr === blueSpr || c.redSmoke ? spr : fsSmokeSpr(s.wear)); }
 }
 function hazeInit(){
   hz = document.createElement('canvas'); hz.width = Math.max(8, Math.ceil(W/HZ_S)); hz.height = Math.max(8, Math.ceil(H/HZ_S)); hzc = hz.getContext('2d');
@@ -1553,7 +1597,7 @@ let hz2 = null;
 function drawHaze(c){ if (!hz) return; let src = hz;
   if (isDust()){   // the slow fade drifts low-alpha colours (rounding), so use the haze as an alpha mask and tint it dust-brown
     if (!hz2 || hz2.width !== hz.width || hz2.height !== hz.height){ hz2 = document.createElement('canvas'); hz2.width = hz.width; hz2.height = hz.height; }
-    const x = hz2.getContext('2d'); x.globalCompositeOperation = 'copy'; x.drawImage(hz, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#bc9c6e'; x.fillRect(0, 0, hz2.width, hz2.height); x.globalCompositeOperation = 'source-over'; src = hz2; }
+    const x = hz2.getContext('2d'); x.globalCompositeOperation = 'copy'; x.drawImage(hz, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#937349'; x.fillRect(0, 0, hz2.width, hz2.height); x.globalCompositeOperation = 'source-over'; src = hz2; }
   c.save(); c.globalAlpha = 0.9; c.imageSmoothingEnabled = true; c.drawImage(src, 0, 0, hz.width*HZ_S, hz.height*HZ_S); c.restore(); }
 function fsReset(){
   G.s = fsStartState(); if (hzc) hzc.clearRect(0, 0, hz.width, hz.height);
@@ -1605,6 +1649,7 @@ function fsStep(dt){
     G.runT += dt;
     const hold = isHolding() && G.engineOn;
     const o = fsPhys(s, hold, steerVal(), c, dt, FSA);
+    gimStep(s, hold, c, dt, true); if (G.state !== 'run') return;
     const p = pose();
     for (const [ev, pts] of o.events){
       if (ev === 'hit'){ Snd.boo(); G.shake = Math.max(G.shake, 7); G.fsBump = -0.6; G.floats.push({ x:p.x, y:p.y - 14, text:'AITA! −60', life:0, col:'#ff6a5a' }); shout(pick(SHOUTS.boo), p);
@@ -1615,7 +1660,7 @@ function fsStep(dt){
       else if (ev === 'slide'){ G.floats.push({ x:p.x, y:p.y - 14, text:`LIUKU! +${pts}`, life:0 }); G.fsBump = Math.max(G.fsBump, 0.2); }
     }
     if (o.chunk){ const rw = rearWheels(p), w = rw[Math.floor(rand(0, rw.length))];
-      for (let i = 0; i < 3; i++){ const a = rand(0,TAU), sp = rand(140,320); debris.push({x:w[0],y:w[1],vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,a:rand(0,TAU),va:rand(-14,14),s:rand(2.2,3.8),life:0,max:rand(0.35,0.8),col:i?'#1a1a1a':'#2a2a2a',stamp:true}); } }
+      for (let i = 0; i < 3; i++){ const a = rand(0,TAU), sp = rand(140,320); debris.push({x:w[0],y:w[1],vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,a:rand(0,TAU),va:rand(-14,14),s:rand(2.2,3.8)*(c.monster ? 2 : 1),life:0,max:rand(0.35,0.8),col:i?'#1a1a1a':'#2a2a2a',stamp:true}); } }
     if (!s.blown && s.wear >= 100) fsBlow();
     if (s.T >= 1){ fsEngineBlow(); return; }
     if (s.blown && s.rimT >= FS_K.rimT){ G.state = 'end'; G.endT = 0; showMsg('SHOW OHI!<small>Yleisö taputtaa</small>', 'show'); Snd.crowdCheer(); }
@@ -1625,6 +1670,7 @@ function fsStep(dt){
     s.slip = 0; s.wr = 0;
     if (!G.engineOn) s.r = Math.max(0, s.r - dt*1.5); else s.r = lerp(s.r, c.idle, 1 - Math.exp(-dt*3));
     if (G.endT > (G.fail ? 2.6 : 1.8)) showResults();
+    if (G.fail === 'flip'){ s.vx *= 0.9; s.vy *= 0.9; }
   }
 }
 // dust over the spectators: they cough, shout and get dusty
@@ -1713,6 +1759,7 @@ function fsHud(){
   if (G.state === 'countdown') h = 'Kaasu = sormi ruudulla · ohjaa vetämällä sivulle';
   else if (G.state === 'run' && isDust() && !s.blown && G.runT < 9 && G.runT >= 6) h = 'Liu\'uta aidan vierestä = EAT MY DUST!';
   else if (G.state === 'run') h = s.blown ? 'Vanteilla! Kaasua – kipinät tuo pisteitä' : G.runT < 6 ? 'Pidä kaasua + vedä sivulle = DONITSI' : (s.T > 0.8 ? 'Nosta kaasua – moottori kuumenee!' : '');
+  const gh = G.state === 'run' && gimHint(); if (gh) h = gh;
   setTxt('hn', el.hint, h);
 }
 function drawTemp(){
@@ -1781,7 +1828,8 @@ const RATINGS = [[0,'LAVETILLA KOTIIN','Yleisö haukotteli. Kokeile donitseja: k
 function fsResults(){
   G.state = 'result'; G.warn = false;
   const s = G.s, c = car(), show = fsTotal(s); let pts, title, sub, stars, bonusTxt = '';
-  if (G.fail === 'engine'){ pts = 0; title = 'HYLÄTTY!'; sub = 'Moottori kuumeni liikaa ja hajosi. Nosta kaasua välillä, kun mittari käy punaisella.'; stars = 0;
+  if (G.fail === 'flip'){ pts = 0; title = 'VOLTTI – HYLÄTTY!'; sub = 'Monsteri keuli liian pitkään ja kaatui katolleen. Nosta kaasua kun keula-mittari käy punaisella.'; stars = 0; bonusTxt = `Show-pisteitä olisi ollut ${show + G.cargoPts}`; }
+  else if (G.fail === 'engine'){ pts = 0; title = 'HYLÄTTY!'; sub = 'Moottori kuumeni liikaa ja hajosi. Nosta kaasua välillä, kun mittari käy punaisella.'; stars = 0;
     bonusTxt = `Show-pisteitä olisi ollut ${show + G.cargoPts}`; }
   else { pts = show + G.cargoPts; let r = RATINGS[0]; for (const q of RATINGS) if (pts >= q[0]) r = q; [, title, sub, stars] = r; if (isDust() && stars === 2) sub = 'Muutama taputti. Kynnä koko kenttä ja pölytä yleisö aidan vierestä!'; if (isDust() && stars === 1) sub = 'Yleisö haukotteli. Liu\'uta aidan vierestä – EAT MY DUST!'; }
   const pp = s.pts, f = v => Math.round(v);
@@ -1790,6 +1838,7 @@ function fsResults(){
     ...(isDust() ? [`💨 EAT MY DUST ${s.dusts}× · Pölytys +${f(pp.dust)}`] : []),
     `Show ${f(pp.style)} · Temput ${f(pp.tricks)} · ${isDust() ? 'Pöly' : 'Savu'} ${f(pp.smoke)}`,
     `Kumipalat ${f(pp.chunks)} · Vannekipinät ${f(pp.rims)}${s.hits ? ` · Aita ${s.hits}× ${f(pp.penalty)}` : ''}`];
+  lines.push(...gimLines(true));
   if (c.cargo){ const what = c.cargo==='hay' ? '🌾 Paaleja kyydistä' : c.cargo==='cans' ? '🥫 Peltipurkkeja irtosi' : '🧳 Tavaroita lensi'; lines.push(`${what}: ${G.cargoCount} = +${G.cargoPts}`); }
   let best = getBest(), bestTxt;
   if (pts > 0 && pts > best){ try{ localStorage.setItem(bestKey(), String(pts)); }catch(e){} bestTxt = best > 0 ? `🏆 UUSI ENNÄTYS! (vanha ${best})` : '🏆 Ensimmäinen ennätys!'; }
@@ -1801,6 +1850,241 @@ function fsResults(){
   $('#resCargo').innerHTML = `<div style="font-size:13px;font-weight:700;color:#ddd;line-height:1.45">${lines.join('<br>')}</div>`;
   $('#resBest').textContent = bestTxt;
   el.res.classList.remove('hidden');
+}
+// ---------------------------------------------------------------- v7 cars: Hemi Cuda, '32 hot rod, monster truck (gimmicks shared by all modes)
+const redSmk = [makeSprite(205,45,45), makeSprite(185,70,70), makeSprite(225,90,85)];
+function gimReset(){
+  G.gim = { pts:0, hemiT:0, hemiOn:false, hemiTot:0, luckT:rand(3,6), lastHic:false, pmT:0, surges:0, hics:0, whHold:0, whOn:false, whTot:0, crushN:0, crushPts:0, prevHold:false, chunkT:0 };
+  G.s.wh = 0; G.s.pm = 1; G.props = [];
+  if (car().monster) gimProps();
+}
+function gimProps(){
+  const P = G.props = [];
+  if (isFree()){
+    const ar = AR, kind = isDust() ? 'bale' : 'tires', n = isDust() ? 7 : 6, cxm = (ar.x0 + ar.x1)/2, cym = ar.y0 + (ar.y1 - ar.y0)*0.55;
+    for (let i = 0, tries = 0; i < n && tries < 200; tries++){
+      const x = rand(ar.x0 + CL*0.7, ar.x1 - CL*0.7), y = rand(ar.y0 + CL*0.9, ar.y1 - CL*0.7);
+      if (Math.hypot(x - cxm, y - cym) < CL*1.6) continue;
+      if (P.some(q => Math.hypot(q.x - x, q.y - y) < CL*1.3)) continue;
+      if (isDust() && inPuddle(x, y)) continue;
+      P.push({ kind, x, y, r:CL*0.22, rot:rand(0,TAU), flat:false, round:Math.random() < 0.4 }); i++;
+    }
+  } else if (path){
+    const ks = ['junk','barrels','junk','tires','barrels'];
+    [0.14, 0.33, 0.52, 0.7, 0.88].forEach((u, i) => { const q = pathAt(u); P.push({ kind:ks[i], x:q.x, y:q.y, r:CL*0.22, rot:q.a + rand(-0.4,0.4), flat:false, col:pick(['#5a7d9a','#8a6a3a','#7a2d2a','#4f6b3a']) }); });
+  }
+}
+function drawProp(c, q){
+  c.save(); c.translate(q.x, q.y); c.rotate(q.rot);
+  const r = q.r, fl = q.flat;
+  if (fl) c.scale(1.35, 1.25);
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(fl ? 1 : 3, fl ? 1 : 4, r*1.25, r*1.0, 0, 0, TAU); c.fill();
+  if (q.kind === 'tires'){
+    if (fl){ c.fillStyle = '#141416'; c.beginPath(); c.ellipse(0, 0, r*1.3, r*0.9, 0, 0, TAU); c.fill(); c.strokeStyle = '#2c2d31'; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 0, r*0.8, r*0.45, 0, 0, TAU); c.stroke(); }
+    else for (let k = 0; k < 3; k++){ c.fillStyle = k === 2 ? '#202124' : '#141416'; c.beginPath(); c.arc(-k*1.5, -k*2.5, r, 0, TAU); c.fill(); c.fillStyle = '#2c2d31'; c.beginPath(); c.arc(-k*1.5, -k*2.5, r*0.45, 0, TAU); c.fill(); }
+  } else if (q.kind === 'bale'){
+    if (q.round && !fl){ c.fillStyle = '#e1c063'; c.beginPath(); c.arc(0, 0, r*1.05, 0, TAU); c.fill(); c.strokeStyle = '#b08a35'; c.lineWidth = 1.2; c.beginPath(); c.arc(0, 0, r*0.65, 0, TAU); c.arc(0, 0, r*0.3, 0, TAU); c.stroke(); }
+    else { c.fillStyle = fl ? '#cdae58' : '#e1c063'; c.fillRect(-r*1.3, -r*(fl ? 0.9 : 0.7), r*2.6, r*(fl ? 1.8 : 1.4)); c.fillStyle = '#c9a248'; for (let k = -r*1.2; k < r*1.3; k += 4) c.fillRect(k, -r*0.7, 1.4, r*1.4);
+      if (!fl){ c.fillStyle = '#8a6a2a'; c.fillRect(-r*0.5, -r*0.7, 1.5, r*1.4); c.fillRect(r*0.4, -r*0.7, 1.5, r*1.4); } }
+  } else if (q.kind === 'barrels'){
+    for (const [dx, dy] of [[-r*0.55, -r*0.45], [r*0.55, -r*0.3], [0, r*0.55]]){ c.fillStyle = fl ? '#7a3a14' : '#c2551c'; c.beginPath(); fl ? c.ellipse(dx, dy, r*0.65, r*0.38, 0.5, 0, TAU) : c.arc(dx, dy, r*0.55, 0, TAU); c.fill();
+      if (!fl){ c.strokeStyle = '#7a3a14'; c.lineWidth = 1.2; c.beginPath(); c.arc(dx, dy, r*0.35, 0, TAU); c.stroke(); } }
+  } else { // junk car
+    c.fillStyle = fl ? shade(q.col, 0.6) : q.col; rr(c, -r*1.6, -r*(fl ? 0.95 : 0.8), r*3.2, r*(fl ? 1.9 : 1.6), 3); c.fill();
+    c.fillStyle = fl ? 'rgba(20,30,40,.6)' : '#2a3a4a'; c.fillRect(-r*0.5, -r*0.6, r*0.9, r*1.2);
+    c.fillStyle = '#7a4a2a'; c.globalAlpha = 0.6; c.beginPath(); c.arc(r*0.9, r*0.3, r*0.35, 0, TAU); c.arc(-r*1.1, -r*0.4, r*0.25, 0, TAU); c.fill(); c.globalAlpha = 1;
+    if (fl){ c.strokeStyle = 'rgba(0,0,0,.4)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-r*1.4, -r*0.2); c.lineTo(r*1.2, r*0.4); c.moveTo(-r*0.6, r*0.7); c.lineTo(r*0.4, -r*0.8); c.stroke(); }
+  }
+  c.restore();
+}
+function drawProps(c){ if (G.props) for (const q of G.props) drawProp(c, q); }
+// per substep, run state only (after the mode's own physics); free = freestyle modes
+function gimStep(s, hold, c, dt, free){
+  const g = G.gim; if (!g) return;
+  const M = free ? (s.M || 1) : 1, add = v => { if (free) s.pts.gim = (s.pts.gim || 0) + v; else g.pts += v; };
+  if (c.hemi){
+    if (hold && s.r > 0.85 && !s.blown) g.hemiT += dt; else g.hemiT = Math.max(0, g.hemiT - 2.5*dt);
+    const on = g.hemiT > 1.4;
+    if (on && !g.hemiOn){ const p = pose(); G.floats.push({ x:p.x, y:p.y - 16, text:'HEMI-JYRINÄ!', life:0, col:'#c48aff' }); Snd.thump(45, 30, 0.5, 0.9); }
+    g.hemiOn = on;
+    if (on){ g.hemiTot += dt; G.shake = Math.max(G.shake, 1.4);
+      if (free){ s.S = Math.min(1, s.S + 0.06*dt); G.fsBump = Math.max(G.fsBump, 0.15); add(7*M*dt); } else add(5*dt); }
+  }
+  if (c.luck){
+    if (g.pmT > 0){ g.pmT -= dt; if (g.pmT <= 0) s.pm = 1; }
+    else if (hold && s.r > 0.5){ g.luckT -= dt;
+      if (g.luckT <= 0){
+        const surge = Math.random() < (g.lastHic ? 0.75 : 0.5), p = pose();
+        if (surge){ s.pm = 1.7; g.pmT = 1.4; g.surges++; g.lastHic = false; const b = Math.round((free ? 90*M : 40)); add(b);
+          showMsg(`TEHOPIIKKI!<small>+${b}</small>`, 'show sm'); Snd.exhaustPop(); Snd.thump(70, 40, 0.3, 0.8); G.shake = Math.max(G.shake, 6); if (free) G.fsBump = Math.max(G.fsBump, 0.4); }
+        else { s.pm = 0.25; g.pmT = 0.5; g.hics++; g.lastHic = true; Snd.cough(); G.floats.push({ x:p.x, y:p.y - 14, text:'NIKOTTELU!', life:0, col:'#ffb36a' }); }
+        g.luckT = rand(4, 8);
+      } }
+  }
+  if (c.monster){
+    const lift = hold && s.r > 0.8 && s.slip > 0.3 && !s.blown && G.state === 'run' && (free ? s.spd < 0.4 : s.v < 0.45);
+    g.whHold = lift ? g.whHold + dt : 0;
+    if (g.whHold > 1.0) s.wh = Math.min(1, s.wh + 0.2*dt*(1 + 0.6*s.wh));
+    else s.wh = Math.max(0, s.wh - (hold ? 0.3 : 1.4)*dt);
+    const on = s.wh > 0.2;
+    if (on && !g.whOn){ const p = pose(); G.floats.push({ x:p.x, y:p.y - 18, text:'KEULII! ×2', life:0, col:'#7dff6a' }); if (free) shout('KEULII!!', p); }
+    g.whOn = on; if (on) g.whTot += dt;
+    if (on && !free) add(s.wr*dt*10);   // track: wear points count double while the front is up
+    if (s.wh >= 1) gimFlip();
+  }
+}
+function gimFlip(){
+  const p = pose();
+  G.fail = 'flip'; G.state = 'end'; G.endT = 0; G.engineOn = false; G.warn = false; G.flash = 0.5; G.shake = 16; G.flipT = 0;
+  if (isFree()){ G.fsEx = 0.25; G.fsBump = 0; shout('VOLTTI!!', p); shout(pick(SHOUTS.boo), p); setTimeout(() => Snd.boo(), 500); }
+  Snd.bang(); Snd.thump(60, 25, 0.8, 1.2);
+  showMsg('VOLTTI!<small>Monsteri kaatui katolleen – HYLÄTTY</small>', 'bang');
+  for (let i = 0; i < 30; i++){ const a = rand(0, TAU), sp = rand(30, 160); addSmoke(p.x, p.y, Math.cos(a)*sp, Math.sin(a)*sp, CWd*0.6, CWd*3, rand(1.5,2.6), 0.5, isDust() ? dustSpr[1] : smokeSpr2); }
+}
+// per frame: sounds/visuals, crushing
+function gimFrame(dt){
+  const g = G.gim, c = car(), s = G.s; if (!g) return;
+  const run = G.state === 'run' || G.state === 'post', hold = isHolding() && run && G.engineOn && !G.blown;
+  if (c.popOnLift && run && g.prevHold && !hold && s.r > 0.55){   // lift-off backfire
+    const p = pose(), [ex, ey] = toWorld(p, -CL*c.len*0.55, CWd*c.wid*0.25);
+    Snd.backfire(); for (let i = 0; i < 4; i++) addSmoke(ex, ey, -Math.cos(p.ang)*rand(40,90), -Math.sin(p.ang)*rand(40,90), CWd*0.15, CWd*0.8, rand(0.15,0.3), 0.8, flameSpr);
+    if (Math.random() < 0.5) setTimeout(() => Snd.backfire(0.6), 140);
+  }
+  g.prevHold = hold;
+  if (G.fail === 'flip') G.flipT = (G.flipT || 0) + dt;
+  if (!c.monster) return;
+  const p = pose();
+  // big rubber chunks
+  if (run && !G.blown && s.wr > 1.5){ g.chunkT -= dt; if (g.chunkT <= 0){ g.chunkT = rand(0.15, 0.5); const rw = rearWheels(p), w = rw[Math.floor(rand(0, rw.length))], a = rand(0, TAU), sp = rand(120, 300);
+    debris.push({ x:w[0], y:w[1], vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, a:rand(0,TAU), va:rand(-10,10), s:rand(4,7), life:0, max:rand(0.5,0.9), col:pick(['#111','#1c1c1c','#2a2a2a']), stamp:true }); } }
+  // crush props and loose objects
+  if (run && G.engineOn){
+    const reach = CL*c.len*0.42;
+    for (const q of G.props){ if (q.flat) continue; if (Math.hypot(q.x - p.x, q.y - p.y) < reach + q.r){ q.flat = true; crushAt(q.x, q.y, q.kind); } }
+    for (const o of G.objs){ if (o.gone || o.z > 2 || o.crushed) continue; if (Math.hypot(o.x - p.x, o.y - p.y) < reach){ o.crushed = true; o.w *= 1.3; o.h *= 0.5; crushAt(o.x, o.y, o.kind, true); } }
+  }
+}
+function crushAt(x, y, kind, small){
+  const g = G.gim, s = G.s, free = isFree(), b = small ? (free ? 25*(s.M||1) : 15) : (free ? 70*(s.M||1) : 35);
+  if (free) s.pts.gim = (s.pts.gim || 0) + b; else g.pts += b;
+  g.crushN++; g.crushPts += b;
+  G.floats.push({ x, y:y - 12, text:`MURSKA! +${b}`, life:0, col:'#7dff6a' }); G.shake = Math.max(G.shake, small ? 3 : 7);
+  Snd.thump(90, 30, 0.25, 0.9); Snd.burst(0.25, 2200, 300, 0.5);
+  const col = kind === 'bale' ? ['#e1c063','#c9a248'] : kind === 'barrels' ? ['#c2551c','#7a3a14'] : kind === 'junk' ? ['#9aa','#555','#2a3a4a'] : ['#111','#333'];
+  for (let i = 0; i < 18; i++){ const a = rand(0, TAU), sp = rand(60, 260); debris.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, a:rand(0,TAU), va:rand(-12,12), s:rand(1.5,4), life:0, max:rand(0.4,0.9), col:pick(col), stamp:Math.random() < 0.4, thin:kind === 'bale' }); }
+  if (kind === 'bale') addStraw(x, y, 14, 120);
+  if (free && Math.random() < 0.7) shout(pick(['MURSKAA!','Jee!','Litteäksi!','Monsteri!']), { x, y });
+}
+// wheelie angle gauge (monster) - drawn on the main canvas
+function drawWheelieG(c){
+  const s = G.s, wh = clamp(s.wh || 0, 0, 1), x = 14, y = H - 128, wd = 92, ht = 58, hot = wh > 0.72;
+  c.save(); c.fillStyle = hot && Math.floor(G.clock*6)%2 ? 'rgba(90,10,10,.9)' : 'rgba(12,12,14,.85)'; rr(c, x, y, wd, ht, 10); c.fill(); c.strokeStyle = hot ? '#ff3b30' : '#c9c9cf'; c.lineWidth = 1.5; c.stroke();
+  const ox = x + 16, oy = y + ht - 12, R0 = 52;
+  c.strokeStyle = '#2c2c30'; c.lineWidth = 5; c.beginPath(); c.arc(ox, oy, R0*0.8, -Math.PI/2, 0); c.stroke();
+  c.strokeStyle = '#3ad46a'; c.beginPath(); c.arc(ox, oy, R0*0.8, -Math.PI*0.36, -Math.PI*0.06); c.stroke();
+  c.strokeStyle = '#ff2d2d'; c.beginPath(); c.arc(ox, oy, R0*0.8, -Math.PI/2, -Math.PI*0.36); c.stroke();
+  const a = -wh*Math.PI/2; c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.moveTo(ox, oy); c.lineTo(ox + Math.cos(a)*R0*0.72, oy + Math.sin(a)*R0*0.72); c.stroke();
+  c.fillStyle = '#eee'; c.beginPath(); c.arc(ox, oy, 3, 0, TAU); c.fill();
+  c.fillStyle = hot ? '#ff6a5a' : '#ddd'; c.font = '900 9px system-ui,Arial'; c.textAlign = 'right'; c.fillText(hot ? 'KAATUU!' : 'KEULA', x + wd - 6, y + 13);
+  c.font = 'bold 11px system-ui,Arial'; c.fillStyle = '#fff'; c.fillText(Math.round(wh*80) + '°', x + wd - 6, y + 28);
+  c.restore();
+}
+function gimHint(){ const c = car(), s = G.s;
+  if (c.monster && (s.wh || 0) > 0.72) return 'NOSTA KAASUA – monsteri kaatuu!';
+  if (c.monster && G.runT < 7 && G.state === 'run') return 'Pitkä kaasu hitaalla = KEULINTA (×2), mutta älä liian pitkään!';
+  return null; }
+function gimLines(free){
+  const g = G.gim, c = car(); if (!g) return [];
+  const f = v => Math.round(v), gp = free ? (G.s.pts.gim || 0) : g.pts;
+  if (c.hemi) return [`🟣 Hemi-jyrinä ${g.hemiTot.toFixed(1)} s · +${f(free ? gp : g.pts)}`];
+  if (c.luck) return [`⚡ Tehopiikit ${g.surges} · Nikottelut ${g.hics} · +${f(gp)}`];
+  if (c.monster) return [`🛻 Keulinta ${g.whTot.toFixed(1)} s · Murskattu ${g.crushN} · +${f(gp)}`];
+  return [];
+}
+// ---- drawings
+function drawCuda(c,car,L,w,o){
+  drawWheels(c,car,L,w,o,0.31,car.rearX);
+  c.fillStyle=bodyGrad(c,car,w); rr(c,-L/2,-w/2,L,w,w*0.18); c.fill();
+  c.fillStyle='rgba(0,0,0,.25)'; c.fillRect(-L*0.5,-w*0.5,L,w*0.06); c.fillRect(-L*0.5,w*0.44,L,w*0.06);
+  // hockey-stick stripes
+  c.fillStyle='#f2f2f2'; c.fillRect(-L*0.32,-w*0.47,L*0.62,w*0.05); c.fillRect(-L*0.32,w*0.42,L*0.62,w*0.05); c.fillRect(-L*0.34,-w*0.47,L*0.04,w*0.16); c.fillRect(-L*0.34,w*0.31,L*0.04,w*0.16);
+  chromeBar(c,L*0.48,L*0.04,w,0.47); c.fillStyle='#111'; c.fillRect(L*0.465,-w*0.4,L*0.02,w*0.8);
+  c.fillStyle='#fff7cf'; c.beginPath(); c.arc(L*0.47,-w*0.33,w*0.07,0,TAU); c.arc(L*0.47,w*0.33,w*0.07,0,TAU); c.fill();
+  chromeBar(c,-L*0.525,L*0.04,w,0.47); tailLights(c,L,w,o,-0.505);
+  glass(c,-L*0.02,L*0.12,0.40,0.35,w); roofRect(c,car,-L*0.25,L*0.24,w,0.37);
+  c.fillStyle='#22303f'; c.beginPath(); c.moveTo(-L*0.25,-w*0.33); c.lineTo(-L*0.25,w*0.33); c.lineTo(-L*0.32,w*0.36); c.lineTo(-L*0.32,-w*0.36); c.closePath(); c.fill();
+  // shaker scoop: bolted to the engine, shakes with revs/throttle
+  const sh = (o.rev||0)*(o.hold?1.6:0.6), jx = rand(-sh,sh), jy = rand(-sh,sh);
+  c.save(); c.translate(L*0.27 + jx, jy);
+  c.fillStyle='rgba(0,0,0,.45)'; rr(c,-L*0.08+2,-w*0.17+3,L*0.16,w*0.34,3); c.fill();
+  c.fillStyle='#151515'; rr(c,-L*0.08,-w*0.17,L*0.16,w*0.34,3); c.fill();
+  c.fillStyle='#2a2a2a'; rr(c,L*0.03,-w*0.13,L*0.05,w*0.26,2); c.fill();
+  c.fillStyle='#e8e8e8'; c.font=`900 ${Math.max(3,w*0.09)}px system-ui,Arial`; c.textAlign='center'; c.textBaseline='middle'; c.save(); c.rotate(Math.PI/2); c.fillText('HEMI',0,L*0.02); c.restore();
+  c.restore();
+}
+function drawHotrod(c,car,L,w,o){
+  // big rear slicks, skinny fronts, narrow body, exposed engine with blower, side pipes
+  const tl=L*0.24, tw=w*0.34, ph=(o.spin||0)%1;
+  const whl=(x,y,l,ww,spin,rear)=>{ c.save(); c.translate(x,y);
+    if (rear && o.blown && spin){ c.fillStyle='#a9abb0'; rr(c,-l*0.4,-ww*0.3,l*0.8,ww*0.6,2); c.fill(); c.restore(); return; }
+    c.fillStyle='rgba(0,0,0,.4)'; rr(c,-l/2+2,-ww/2+3,l,ww,3); c.fill(); c.fillStyle='#0d0d0d'; rr(c,-l/2,-ww/2,l,ww,3); c.fill();
+    c.strokeStyle='#2a2a2a'; c.lineWidth=1; if (spin) for (let k=0;k<4;k++){ const xx=-l/2+((k/4+ph)%1)*l; c.beginPath(); c.moveTo(xx,-ww/2); c.lineTo(xx,ww/2); c.stroke(); }
+    c.fillStyle='#c9c9cf'; c.beginPath(); c.arc(0,y<0?-ww*0.5:ww*0.5,ww*0.12,0,TAU); c.fill(); c.restore(); };
+  whl(L*car.rearX,-w*0.55,tl,tw,true,true); whl(L*car.rearX,w*0.55,tl,tw,true,true);
+  whl(L*0.36,-w*0.5,L*0.15,w*0.15,false,false); whl(L*0.36,w*0.5,L*0.15,w*0.15,false,false);
+  c.fillStyle='#777'; c.fillRect(L*0.3,-w*0.5,L*0.03,w); // front axle
+  // body: cab at the back, long narrow nose
+  c.fillStyle=bodyGrad(c,car,w*0.8); rr(c,-L*0.46,-w*0.36,L*0.48,w*0.72,w*0.14); c.fill();
+  c.fillStyle=car.bodyDark; rr(c,L*0.0,-w*0.2,L*0.44,w*0.4,w*0.1); c.fill();
+  c.fillStyle='#d8d8dc'; rr(c,L*0.4,-w*0.18,L*0.07,w*0.36,2); c.fill(); c.fillStyle='#333'; for (let k=-3;k<=3;k++) c.fillRect(L*0.41,k*w*0.045-0.5,L*0.05,1);
+  c.fillStyle='#fff7cf'; c.beginPath(); c.arc(L*0.42,-w*0.3,w*0.07,0,TAU); c.arc(L*0.42,w*0.3,w*0.07,0,TAU); c.fill();
+  // cockpit (open) + roll bar
+  c.fillStyle='#2a1a12'; rr(c,-L*0.3,-w*0.26,L*0.24,w*0.52,w*0.08); c.fill();
+  c.fillStyle='#8a5a3a'; rr(c,-L*0.27,-w*0.2,L*0.1,w*0.4,3); c.fill();
+  c.strokeStyle='#ddd'; c.lineWidth=2; c.beginPath(); c.moveTo(-L*0.33,-w*0.28); c.lineTo(-L*0.33,w*0.28); c.stroke();
+  c.fillStyle='rgba(160,200,230,.55)'; c.fillRect(-L*0.06,-w*0.27,L*0.025,w*0.54);
+  // side pipes
+  for (const sy of [-1,1]){ const cg=c.createLinearGradient(0,sy*w*0.36,0,sy*w*0.46); cg.addColorStop(0,'#f8f8f8'); cg.addColorStop(1,'#8a8c92'); c.fillStyle=cg; rr(c,-L*0.3,sy>0?w*0.36:-w*0.46,L*0.55,w*0.1,w*0.05); c.fill(); }
+  tailLights(c,L,w*0.75,o,-0.47);
+  // blower sticking up, butterflies; jiggles with the lumpy idle
+  const jb = (o.hold?0.8:0.4)*rand(-1,1), bx=L*0.08, bl=L*0.24, bw=w*0.36;
+  c.save(); c.translate(jb*0.5, jb*0.3);
+  c.fillStyle='rgba(0,0,0,.45)'; rr(c,bx+4,-bw/2+5,bl,bw,3); c.fill();
+  const g2=c.createLinearGradient(0,-bw/2,0,bw/2); g2.addColorStop(0,'#7d8087'); g2.addColorStop(.5,'#fff'); g2.addColorStop(1,'#6d7077'); c.fillStyle=g2; rr(c,bx,-bw/2,bl,bw,3); c.fill();
+  c.strokeStyle='rgba(0,0,0,.4)'; c.lineWidth=1; for (let k=1;k<6;k++){ c.beginPath(); c.moveTo(bx+k*bl/6,-bw/2); c.lineTo(bx+k*bl/6,bw/2); c.stroke(); }
+  c.fillStyle='#1a1a1a'; rr(c,bx+bl*0.25,-bw*0.32,bl*0.55,bw*0.64,3); c.fill(); c.fillStyle='#c0c3c9'; for (let k=0;k<2;k++) c.fillRect(bx+bl*0.33+k*bl*0.22,-bw*0.24,bl*0.14,bw*0.48);
+  c.restore();
+}
+function drawMonster(c,car,L,w,o){
+  const wh = o.wh||0;
+  if (o.flip){ // on its roof: chassis + wheels up, slowly spinning
+    c.fillStyle='#2a2b2e'; rr(c,-L*0.45,-w*0.32,L*0.9,w*0.64,6); c.fill(); c.fillStyle='#555'; c.fillRect(-L*0.4,-w*0.05,L*0.8,w*0.1); c.fillRect(L*0.28,-w*0.3,L*0.04,w*0.6); c.fillRect(-L*0.32,-w*0.3,L*0.04,w*0.6);
+    for (const [x,y] of [[0.3,-0.42],[0.3,0.42],[-0.3,-0.42],[-0.3,0.42]]){ c.fillStyle='#0d0d0d'; c.beginPath(); c.ellipse(L*x,w*y,L*0.15,w*0.15,0,0,TAU); c.fill(); c.fillStyle='#aaa'; c.beginPath(); c.arc(L*x,w*y,w*0.05,0,TAU); c.fill(); }
+    return; }
+  c.save(); if (wh > 0){ c.translate(-L*0.3, 0); c.scale(1 + 0.14*wh, 1 + 0.06*wh); c.translate(L*0.3, 0); }
+  const tl=L*0.3, tw=w*0.3, ph=(o.spin||0)%1;
+  const tire=(x,y,spin,rear,lift)=>{ c.save(); c.translate(x,y);
+    if (rear && o.blown){ c.fillStyle='#a9abb0'; c.beginPath(); c.ellipse(0,0,tl*0.42,tw*0.4,0,0,TAU); c.fill(); c.restore(); return; }
+    c.fillStyle='rgba(0,0,0,.4)'; rr(c,-tl/2+3+lift*8,-tw/2+4+lift*6,tl,tw,6); c.fill();
+    c.fillStyle='#0b0b0b'; rr(c,-tl/2,-tw/2,tl,tw,6); c.fill();
+    c.fillStyle='#262626'; const n=7; for (let k=0;k<n;k++){ const xx=-tl/2+((k/n+(spin?ph:0))%1)*tl; c.fillRect(xx,-tw/2,tl*0.07,tw); }
+    c.restore(); };
+  tire(L*car.rearX,-w*0.5,true,true,0); tire(L*car.rearX,w*0.5,true,true,0);
+  tire(L*0.3,-w*0.5,false,false,wh); tire(L*0.3,w*0.5,false,false,wh);
+  // chassis + suspension
+  c.fillStyle='#444'; c.fillRect(-L*0.36,-w*0.38,L*0.04,w*0.76); c.fillRect(L*0.28,-w*0.38,L*0.04,w*0.76);
+  c.fillStyle='#d9c22a'; for (const [x,y] of [[-0.25,-0.3],[-0.25,0.3],[0.22,-0.3],[0.22,0.3]]){ c.fillRect(L*x-2,w*y-2,5,5); }
+  // body high up (big shadow)
+  c.fillStyle='rgba(0,0,0,.35)'; rr(c,-L*0.33+6+wh*6,-w*0.27+8,L*0.68,w*0.54,6); c.fill();
+  c.fillStyle=bodyGrad(c,car,w*0.56); rr(c,-L*0.34,-w*0.28,L*0.7,w*0.56,w*0.1); c.fill();
+  c.fillStyle='#f2d21a'; c.beginPath(); c.moveTo(-L*0.3,-w*0.24); c.lineTo(L*0.05,-w*0.24); c.lineTo(-L*0.08,w*0.24); c.lineTo(-L*0.3,w*0.24); c.closePath(); c.globalAlpha=0.35; c.fill(); c.globalAlpha=1;
+  glass(c,L*0.02,L*0.12,0.24,0.22,w); roofRect(c,car,-L*0.16,L*0.18,w,0.22);
+  c.fillStyle='#ddd'; rr(c,-L*0.3,-w*0.22,L*0.12,w*0.44,3); c.fill();   // bed cover
+  c.fillStyle='#111'; c.font=`900 ${Math.max(4,w*0.11)}px system-ui,Arial`; c.textAlign='center'; c.textBaseline='middle'; c.save(); c.translate(-L*0.24,0); c.rotate(Math.PI/2); c.fillText('MÖRKÖ',0,0); c.restore();
+  c.fillStyle='#fff7cf'; for (const y of [-0.12,-0.04,0.04,0.12]){ c.beginPath(); c.arc(-L*0.06,w*y,w*0.025,0,TAU); c.fill(); }   // roof light bar
+  c.fillStyle='#fff7cf'; c.beginPath(); c.arc(L*0.35,-w*0.2,w*0.05,0,TAU); c.arc(L*0.35,w*0.2,w*0.05,0,TAU); c.fill();
+  tailLights(c,L*0.68,w*0.56,o,-0.5);
+  c.restore();
 }
 
 // ---------------------------------------------------------------- update
@@ -1827,6 +2111,7 @@ function update(dt){
   if (!G.blown && G.engineOn) G.spin += (s.slip*25 + s.v*6)*dt;
   p = pose();
   if (G.cargo.length) updCargo(dt);
+  gimFrame(dt);
   if (G.cans.length) updCans(dt);
   // police lights + siren when burning hard
   if (c.police){
@@ -1869,7 +2154,7 @@ function update(dt){
         const sp=rand(20,60)*(0.5+s.slip);
         addSmoke(rw[i][0]+rand(-3,3), rw[i][1]+rand(-3,3), bx*sp+rand(-18,18), by*sp+rand(-18,18),
           CWd*rand(0.35,0.6), CWd*rand(1.3,2.3)*(0.7+s.wr/20)*(c.markW?1.2:1), rand(1.6,3.0)*fsm, rand(0.3,0.55)*clamp(0.5+s.wr/15,0,1)*fsm,
-          G.lights && Math.random()<0.6 ? (Math.random()<0.5?redSpr:blueSpr) : null);
+          c.redSmoke ? pick(redSmk) : G.lights && Math.random()<0.6 ? (Math.random()<0.5?redSpr:blueSpr) : null);
       }
     }
   }
@@ -1931,7 +2216,8 @@ function drawTach(){
   for (let k=0;k<=7;k++){ const a=fr(k*1000); c.beginPath(); c.moveTo(x+Math.cos(a)*(r-9),y+Math.sin(a)*(r-9)); c.lineTo(x+Math.cos(a)*(r-2),y+Math.sin(a)*(r-2)); c.stroke();
     c.fillText(String(k), x+Math.cos(a)*(r-16), y+Math.sin(a)*(r-16)); }
   c.font='bold 8px system-ui,Arial'; c.fillStyle='#aaa'; c.fillText('RPM ×1000', x, y+20);
-  const a=fr(rpmOf(G.s.r));
+  const lum = cr.snd && cr.snd.lumpy && G.engineOn ? (Math.sin(G.clock*23)*0.5 + Math.sin(G.clock*7.3)*0.5)*0.035*(1.2 - G.s.r) + (Math.random()<0.15 ? rand(-0.05,0.02) : 0) : 0;
+  const a=fr(rpmOf(clamp(G.s.r + lum, 0, 1)));
   c.strokeStyle= G.warn ? '#ff3b30' : '#ff8a1a'; c.lineWidth=3; c.beginPath(); c.moveTo(x,y); c.lineTo(x+Math.cos(a)*(r-6),y+Math.sin(a)*(r-6)); c.stroke();
   c.fillStyle='#eee'; c.beginPath(); c.arc(x,y,4,0,TAU); c.fill();
 }
@@ -1965,9 +2251,10 @@ function render(){
   ctx.drawImage(bg,0,0,W,H); ctx.drawImage(marks,0,0,W,H);
   if (isFree() && !DBG.noCrowd) drawCrowd(ctx);
   else if (G.state!=='menu' && G.laps===1) drawProgress(ctx);
+  drawProps(ctx);
   drawObjects(ctx,false);
   const p=pose(), cr=car();
-  const dc = () => drawCar(ctx,p.x,p.y,p.ang,cr,CL,CWd,{spin:G.spin, blown:G.blown, cargo:G.cargo, flash:G.flashPh, boost:G.s.boost||0, noBouquet:G.noBouquet,
+  const dc = () => drawCar(ctx,p.x,p.y,p.ang,cr,CL,CWd,{spin:G.spin, blown:G.blown, cargo:G.cargo, flash:G.flashPh, boost:G.s.boost||0, noBouquet:G.noBouquet, rev:G.s.r||0, hold:isHolding()&&G.state==='run', wh:G.s.wh||0, flip:G.fail==='flip',
     brake: G.finished || G.blown || (G.state==='run' && !isHolding())});
   dc();
   drawParticles(ctx);
@@ -1986,7 +2273,7 @@ function render(){
   if (isFree()) drawCrowdOver(ctx);
   drawFloats(ctx,lastDt);
   if (G.flash>0){ ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=`rgba(255,250,220,${(G.flash*0.85).toFixed(3)})`; ctx.fillRect(0,0,cv.width,cv.height); }
-  if (G.state!=='menu'){ drawTach(); if (car().boost) drawBoost(); if (isFree()) drawTemp(); }
+  if (G.state!=='menu'){ drawTach(); if (car().boost) drawBoost(); if (isFree()) drawTemp(); if (car().monster){ ctx.setTransform(dpr,0,0,dpr,0,0); drawWheelieG(ctx); } }
 }
 function drawBoost(){
   const c=el.boostG.getContext('2d'), wd=86, ht=60, s=G.s, b=s.boost||0, heat=(s.heat||0)/car().heatMax, oh=(s.oh||0)>0;
@@ -2044,7 +2331,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (e.code==='Space' || e.code==='ArrowUp') keyHold=false; if (e.code==='ArrowLeft') keyL=false; if (e.code==='ArrowRight') keyR=false; keySteer=(keyR?1:0)-(keyL?1:0); });
 
 // ---------------------------------------------------------------- menu
-const ORDER=['fury','super','valiant','pickup','wagon','caddy'];
+const ORDER=['fury','super','valiant','pickup','wagon','caddy','cuda','hotrod','monster'];
 $('#carGrid').innerHTML = ORDER.map(id => `<button class="car${id===G.carId?' sel':''}" data-car="${id}"><canvas data-prev="${id}"></canvas><div class="nm">${CARS[id].short}</div></button>`).join('');
 function refreshInfo(){
   const c=car();
@@ -2056,7 +2343,7 @@ function refreshInfo(){
 }
 function toMenuScene(){
   G.state='menu'; G.s = isFree() ? fsStartState() : {r:0.2,v:0,wear:0,prog:0,slip:0,wr:0,E:0}; if (isFree()) fsReset(); G.fail=null; G.engineOn=true; G.blown=false; G.finished=false; G.drift=0; G.engineOn=true;
-  G.cargo=makeCargo(car()); G.cans=makeCans(car()); G.objs=[]; G.floats=[]; smoke=[]; debris=[]; G.lights=false; G.flashPh=0; G.noBouquet=false; G.boosting=false;
+  G.cargo=makeCargo(car()); G.cans=makeCans(car()); G.objs=[]; gimReset(); G.floats=[]; smoke=[]; debris=[]; G.lights=false; G.flashPh=0; G.noBouquet=false; G.boosting=false;
 }
 document.querySelectorAll('.car').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.car').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
@@ -2093,7 +2380,7 @@ window.addEventListener('orientationchange', () => setTimeout(() => { layout(); 
 layout(); toMenuScene(); drawPreviews(); refreshInfo();
 requestAnimationFrame(frame);
 
-window.__burnis = { puddles:()=>puddles, wind:()=>G.wind, cnt:()=>({smoke:smoke.length, debris:debris.length, floats:G.floats.length, objs:G.objs.length, shouts:(G.fsShouts||[]).length, fl:(G.fsFlashes||[]).length}), DBG, FSA:()=>FSA, G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
+window.__burnis = { gim:()=>G.gim, props:()=>G.props, puddles:()=>puddles, wind:()=>G.wind, cnt:()=>({smoke:smoke.length, debris:debris.length, floats:G.floats.length, objs:G.objs.length, shouts:(G.fsShouts||[]).length, fl:(G.fsFlashes||[]).length}), DBG, FSA:()=>FSA, G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
 })();
 </script>
 </body>
