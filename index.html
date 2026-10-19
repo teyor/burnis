@@ -157,7 +157,7 @@
   <button class="big" id="btnStart">ALOITA</button>
   <div class="help hidden" id="helpFree">
     <b>Freestyle:</b> pidä sormi ruudulla = kaasu, <b>vedä sivulle = ohjaa</b> (kauemmas = jyrkemmin). Kaasu + ohjaus = <b>donitsit</b>!<br>
-    Kumi kuluu vain liikkeessä: donitsit ja liu'ut täyttävät <b>SHOW-mittarin</b>, jatkuva poltto kasvattaa kerrointa. Kahdeksikko = isot pisteet. Aitaan osuminen = miinusta ja buuausta.<br>
+    Kumi kuluu vain liikkeessä: <b>maalaa koko kenttä mustaksi</b> – uusi asfaltti tuo eniten pisteitä (Peitto %), samassa kohdassa pyöriminen yhä vähemmän. Donitsit ja liu'ut täyttävät <b>SHOW-mittarin</b>, jatkuva poltto kasvattaa kerrointa. Aitaan osuminen = miinusta ja buuausta.<br>
     Kun renkaat paukkuvat, jatka vanteilla – kipinät tuo loppupisteet.<br>
     <b>Moottorin lämpö:</b> pitkä täyskaasu kuumentaa. Punaisella → höyryä ja nakutusta – nosta kaasua! Ylikuumeneminen = moottori leviää = <b>HYLÄTTY</b>.<br>
     🔊 Äänet päälle. (Tietokoneella: välilyönti/↑ = kaasu, ←/→ = ohjaus.)
@@ -872,8 +872,8 @@ let smoke = [], debris = [];
 const redSpr = makeSprite(255,170,170), blueSpr = makeSprite(170,190,255), flameSpr = makeSprite(255,170,60);
 const MAX_SMOKE = 450;
 function addSmoke(x,y,vx,vy,r0,gr,life,a,spr){
-  if (smoke.length >= MAX_SMOKE) smoke.shift();
-  smoke.push({x,y,vx,vy,r:r0,gr,life:0,max:life,a,spr:spr||(Math.random()<0.5?smokeSpr:smokeSpr2)});
+  if (smoke.length >= (G.trackId==='free' ? 260 : MAX_SMOKE)) smoke.shift();   // arena: the haze layer carries the lingering smoke
+  smoke.push({x,y,vx,vy,r:r0,gr,life:0,max:life,a,spr:spr||(Math.random()<0.5?smokeSpr:smokeSpr2), rmax: G.trackId==='free' ? CWd*3.2 : 0});
 }
 function addStraw(x,y,n,spd){
   for (let i=0;i<n;i++){ const a=rand(0,TAU), sp=rand(10,spd||90);
@@ -884,7 +884,7 @@ function updParticles(dt){
   for (let i=smoke.length-1;i>=0;i--){
     const p=smoke[i]; p.life+=dt; if (p.life>=p.max){ smoke.splice(i,1); continue; }
     const k=Math.exp(-dt*1.6); p.vx*=k; p.vy*=k; p.vx += 6*dt; p.vy -= 3*dt;
-    p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.gr*dt*(1-p.life/p.max*0.6);
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.gr*dt*(1-p.life/p.max*0.6); if (p.rmax && p.r>p.rmax) p.r=p.rmax;
   }
   for (let i=debris.length-1;i>=0;i--){
     const p=debris[i]; p.life+=dt;
@@ -1223,7 +1223,8 @@ function fsNew(){
   return { r:0.2, v:0, wear:0, prog:0, slip:0, wr:0, E:0, x:0, y:0, h:-Math.PI/2, vx:0, vy:0, w:0, u:0, lat:0, spd:0,
     T:FS_K.T0, holdT:0, blown:false, rimT:0, wrT:0, S:0, M:1, burnT:0, gap:9, rot:0, lastDonut:0, lastDir:0, tSince:99, slideT:0,
     markLen:0, smokeAmt:0, chunks:0, hits:0, hitCd:0, donuts:0, eights:0,
-    pts:{ style:0, marks:0, smoke:0, tricks:0, chunks:0, rims:0, penalty:0 } };
+    cov:null, covN:0, covTot:1, covPrev:null, covLast:null, covAtTrick:0,
+    pts:{ style:0, marks:0, cover:0, smoke:0, tricks:0, chunks:0, rims:0, penalty:0 } };
 }
 // one physics step; ar = arena bounds in car lengths {x0,x1,y0,y1}; returns {hit, events:[], chunk}
 function fsPhys(s, hold, steer, c, dt, ar){
@@ -1294,22 +1295,24 @@ function fsPhys(s, hold, steer, c, dt, ar){
     if (s.wr > 3){ s.burnT += dt; s.gap = 0; } else { s.gap += dt; if (s.gap > 1.5) s.burnT = 0; }
     s.M = Math.min(5, 1 + Math.floor(s.burnT/5));
     const M = s.M;
-    if (burning){ s.pts.marks += (spdN*FS_VM + 0.4*Math.abs(s.w))*dt*3*M; s.pts.smoke += Math.min(90, 6 + s.wr*4)*nW*dt*0.10*M; }
+    fsCover(s, c, ar, M, burning);
+    if (burning) s.pts.smoke += Math.min(90, 6 + s.wr*4)*nW*dt*0.05*M;
     const donut = s.slip > 0.28 && Math.abs(s.w) > 1.3;
     let fill = 0;
     if (donut) fill += 0.10*Math.min(1.6, Math.abs(s.w)/2.2);
     if (Math.abs(lat) > 0.18 && s.slip > 0.2) fill += 0.08*Math.min(1.5, Math.abs(lat)/0.35);
     if (burning) fill += 0.02;
     s.S = clamp(s.S + fill*dt - (fill > 0.03 ? 0.03 : 0.13)*dt, 0, 1);
-    s.pts.style += s.S*14*M*dt;
+    s.pts.style += s.S*9*M*dt;
     // donuts and figure-eights
     s.tSince += dt;
     if (donut){ if (Math.sign(s.w) !== Math.sign(s.rot) && Math.abs(s.rot) < 1) s.rot = 0; s.rot += s.w*dt; }
     else s.rot *= Math.exp(-dt*0.7);
     if (Math.abs(s.rot) >= TAU){
       const dir = Math.sign(s.rot); s.rot -= dir*TAU; s.donuts++;
-      if (s.lastDir && dir !== s.lastDir && s.tSince < 5){ s.eights++; s.pts.tricks += 200*M; s.S = Math.min(1, s.S + 0.25); out.events.push(['eight', 200*M]); }
-      else { s.pts.tricks += 60*M; s.S = Math.min(1, s.S + 0.1); out.events.push(['donut', 60*M]); }
+      const fresh = clamp(0.2 + (s.covN - s.covAtTrick)/40, 0.2, 1); s.covAtTrick = s.covN;   // same spot again = smaller bonus
+      if (s.lastDir && dir !== s.lastDir && s.tSince < 5){ s.eights++; const p8 = Math.round(200*M*fresh); s.pts.tricks += p8; s.S = Math.min(1, s.S + 0.25); out.events.push(['eight', p8]); }
+      else { const pd = Math.round(60*M*fresh); s.pts.tricks += pd; s.S = Math.min(1, s.S + 0.1*fresh); out.events.push(['donut', pd]); }
       s.lastDir = dir; s.tSince = 0;
     }
     if (Math.abs(lat) > 0.22 && spdN > 0.3) s.slideT += dt;
@@ -1323,7 +1326,29 @@ function fsPhys(s, hold, steer, c, dt, ar){
   }
   return out;
 }
-function fsTotal(s){ const p = s.pts; return Math.max(0, Math.round(p.style + p.marks + p.smoke + p.tricks + p.chunks + p.rims + p.penalty)); }
+function fsTotal(s){ const p = s.pts; return Math.max(0, Math.round(p.style + p.marks + p.cover + p.smoke + p.tricks + p.chunks + p.rims + p.penalty)); }
+// Coverage: a grid over the arena (cells ~0.11 car lengths ≈ 6 px). Fresh asphalt pays, repeat passes pay less and less.
+const FS_CELL = 0.11, FS_COVER_PTS = 2.4, FS_GAIN = [1, 0.3, 0.1, 0.04];
+function fsCover(s, c, ar, M, burning){
+  if (!s.cov){ s.cgw = Math.ceil((ar.x1-ar.x0)/FS_CELL); s.cgh = Math.ceil((ar.y1-ar.y0)/FS_CELL); s.cov = new Uint8Array(s.cgw*s.cgh); s.covTot = s.cgw*s.cgh; }
+  if (!burning){ s.covPrev = null; return; }
+  const cf = Math.cos(s.h), sf = Math.sin(s.h), rx = c.len*c.rearX, wv = 0.42*c.wid*0.47;
+  const ks = c.oneWheel ? [1] : [-1, 1], cur = ks.map(k => [s.x + rx*cf - k*wv*sf, s.y + rx*sf + k*wv*cf]);
+  if (!s.covLast || s.covLast.length !== ks.length) s.covLast = ks.map(() => -1);
+  if (s.covPrev && s.covPrev.length === cur.length){
+    for (let i = 0; i < cur.length; i++){
+      const [x0, y0] = s.covPrev[i], [x1, y1] = cur[i], d = Math.hypot(x1-x0, y1-y0), n = Math.max(1, Math.ceil(d/(FS_CELL*0.5)));
+      for (let k = 1; k <= n; k++){
+        const x = x0 + (x1-x0)*k/n, y = y0 + (y1-y0)*k/n, gx = Math.floor((x-ar.x0)/FS_CELL), gy = Math.floor((y-ar.y0)/FS_CELL);
+        if (gx < 0 || gy < 0 || gx >= s.cgw || gy >= s.cgh) continue;
+        const ci = gy*s.cgw + gx; if (ci === s.covLast[i]) continue; s.covLast[i] = ci;
+        const cnt = s.cov[ci]; if (cnt === 0) s.covN++; if (cnt < 255) s.cov[ci] = cnt + 1;
+        s.pts.cover += FS_GAIN[Math.min(cnt, FS_GAIN.length-1)]*FS_COVER_PTS*M;
+      }
+    }
+  }
+  s.covPrev = cur;
+}
 /*FS_END*/
 // ---------------------------------------------------------------- freestyle: arena, crowd, HUD, effects
 let AR = null, FSA = null, crowd = [];
@@ -1388,8 +1413,46 @@ function fsPose(){
   const s = G.s, jit = G.state==='run' && !s.blown ? s.slip*1.2 : (s.blown && G.state==='run' ? 0.8 : 0);
   return { x: s.x*CL + rand(-jit,jit), y: s.y*CL + rand(-jit,jit), ang: s.h, a: s.h, k: s.w > 0 ? 0.01 : -0.01 };
 }
+// ---- smoke: darkens with wear, piles up when slow, trails at speed, lingers longer late in the run
+const greySpr = makeSprite(160,160,164), dkSpr = makeSprite(98,98,102), blkSpr = makeSprite(52,52,56);
+let hz = null, hzc = null; const HZ_S = 6;   // low-res haze layer (1 px = 8 css px)
+function fsSmokeSpr(wear){
+  const q = wear/100 + rand(-0.1, 0.1);
+  return q < 0.3 ? (Math.random() < 0.5 ? smokeSpr : smokeSpr2) : q < 0.5 ? smokeSpr2 : q < 0.7 ? greySpr : q < 0.88 ? dkSpr : blkSpr;
+}
+function fsEmitSmoke(w, s, c, p, bx, by){
+  const wf = clamp(s.wear/100, 0, 1), spx = s.spd*FS_VM*CL, slow = 1 - clamp(spx/(1.3*CL), 0, 1);
+  const spr = G.lights && Math.random() < 0.3 ? (Math.random() < 0.5 ? redSpr : blueSpr) : fsSmokeSpr(s.wear);
+  const spread = 16 + 26*slow, back = rand(20,60)*(0.5 + s.slip)*(1 - slow);
+  addSmoke(w[0] + rand(-3,3), w[1] + rand(-3,3), bx*back + s.vx*CL*0.12 + rand(-spread,spread), by*back + s.vy*CL*0.12 + rand(-spread,spread),
+    CWd*rand(0.35,0.6), CWd*rand(1.3,2.3)*(0.7 + s.wr/20)*(c.markW ? 1.2 : 1)*(1 + 0.3*slow)/(1 + 0.9*wf),   // longer life, same final size
+    rand(1.5,2.8)*(1 + 1.5*wf)*(1 + 0.4*slow), rand(0.3,0.55)*clamp(0.5 + s.wr/15, 0, 1)*(0.65 + 0.35*slow), spr);
+  if (slow > 0.4 && Math.random() < 0.35*slow){   // standing burnout: the cloud rolls over the car
+    addSmoke(p.x + rand(-CL*0.3, CL*0.3), p.y + rand(-CL*0.3, CL*0.3), rand(-14,14), rand(-14,14), CWd*rand(0.6,1), CWd*rand(1.4,2.2)/(1 + 0.8*wf),
+      rand(1.6,2.6)*(1 + 1.2*wf), rand(0.35,0.6)*slow, spr === redSpr || spr === blueSpr ? spr : fsSmokeSpr(s.wear)); }
+}
+function hazeInit(){
+  hz = document.createElement('canvas'); hz.width = Math.max(8, Math.ceil(W/HZ_S)); hz.height = Math.max(8, Math.ceil(H/HZ_S)); hzc = hz.getContext('2d');
+}
+function hazeUpdate(dt){
+  if (!hz || hz.width !== Math.ceil(W/HZ_S)) hazeInit();
+  const wf = clamp(G.s.wear/100 || 0, 0, 1), run = G.state === 'run' || G.state === 'end';
+  // deposit: a sample of live particles leaves a faint stain in the haze
+  if (run && smoke.length){
+    const n = Math.min(40, smoke.length), dep = dt*(0.5 + 2.4*wf);
+    for (let k = 0; k < n; k++){ const q = smoke[Math.floor(Math.random()*smoke.length)]; if (q.spr === flameSpr) continue;
+      const f = q.life/q.max, a = q.a*(1 - f)*dep*(smoke.length/n)/10; if (a <= 0.001) continue;
+      hzc.globalAlpha = Math.min(0.5, a); const r = q.r*1.3/HZ_S, sp = (q.spr === redSpr || q.spr === blueSpr) ? fsSmokeSpr(G.s.wear) : q.spr; hzc.drawImage(sp, q.x/HZ_S - r, q.y/HZ_S - r, 2*r, 2*r); }
+    hzc.globalAlpha = 1;
+  }
+  // fade: quick with fresh tyres, very slow at the end of the run -> arena goes hazy
+  const fade = G.state === 'menu' ? 2 : lerp(0.45, 0.035, wf);
+  hzc.globalCompositeOperation = 'destination-out'; hzc.fillStyle = `rgba(0,0,0,${Math.min(1, fade*dt).toFixed(4)})`; hzc.fillRect(0, 0, hz.width, hz.height);
+  hzc.globalCompositeOperation = 'source-over';
+}
+function drawHaze(c){ if (!hz) return; c.save(); c.globalAlpha = 0.9; c.imageSmoothingEnabled = true; c.drawImage(hz, 0, 0, hz.width*HZ_S, hz.height*HZ_S); c.restore(); }
 function fsReset(){
-  G.s = fsStartState();
+  G.s = fsStartState(); if (hzc) hzc.clearRect(0, 0, hz.width, hz.height);
   G.fsEx = 0.08; G.fsBump = 0; G.fsShouts = []; G.fsFlashes = []; G.fsShoutT = 2; G.fsKnockT = 0; G.fsHot = false; G.fsEndMsg = false;
 }
 function shout(text, near){
@@ -1461,6 +1524,7 @@ function fsStep(dt){
 // per-frame visuals / crowd / sound cues
 function fsFrame(dt){
   const s = G.s, c = car(), p = pose(), run = G.state === 'run';
+  hazeUpdate(dt);
   // crowd excitement
   let tgt = 0.06;
   if (run) tgt = s.blown ? 1 : clamp(0.08 + s.S*0.95 + Math.max(0, G.fsBump), 0, 1);
@@ -1511,7 +1575,7 @@ function fsHud(){
   setTxt('fm', el.fsMult, '×' + (s.M || 1));
   setStyle('fmc', el.fsMult, 'color', (s.M||1) >= 4 ? '#ff5a2a' : (s.M||1) >= 2 ? '#ffcf5a' : '#fff');
   setStyle('sf', el.showFill, 'width', (clamp(s.S, 0, 1)*100).toFixed(1) + '%');
-  setTxt('lt', el.lapTxt, s.blown ? 'VANTEILLA!' : 'FREESTYLE');
+  setTxt('lt', el.lapTxt, s.blown ? 'VANTEILLA!' : `Peitto ${Math.floor(100*s.covN/(s.covTot||1))} %`);
   setStyle('wn', el.warn, 'display', G.fsHot ? 'block' : 'none');
   let h = '';
   if (G.state === 'countdown') h = 'Kaasu = sormi ruudulla · ohjaa vetämällä sivulle';
@@ -1578,8 +1642,8 @@ function drawCrowdOver(c){
   }
   c.globalAlpha = 1; c.textBaseline = 'alphabetic';
 }
-const RATINGS = [[0,'LAVETILLA KOTIIN','Yleisö haukotteli. Kokeile donitseja: kaasu + vedä sivulle.',1],[1500,'IHAN KELPO','Muutama taputti. Pidempiä liukuja ja enemmän savua!',2],
-  [3000,'HYVÄ SHOW!','Yleisö nousi seisomaan!',3],[4500,'YLEISÖ VILLIINTYI!','Liput heiluu ja kamerat välkkyy!',4],[6000,'LEGENDAARINEN!','Tästä puhutaan vielä vuosia!',5]];
+const RATINGS = [[0,'LAVETILLA KOTIIN','Yleisö haukotteli. Kokeile donitseja: kaasu + vedä sivulle.',1],[2500,'IHAN KELPO','Muutama taputti. Liiku ja maalaa koko kenttä mustaksi!',2],
+  [5000,'HYVÄ SHOW!','Yleisö nousi seisomaan!',3],[7500,'YLEISÖ VILLIINTYI!','Liput heiluu ja kamerat välkkyy!',4],[10000,'LEGENDAARINEN!','Tästä puhutaan vielä vuosia!',5]];
 function fsResults(){
   G.state = 'result'; G.warn = false;
   const s = G.s, c = car(), show = fsTotal(s); let pts, title, sub, stars, bonusTxt = '';
@@ -1588,7 +1652,8 @@ function fsResults(){
   else { pts = show + G.cargoPts; let r = RATINGS[0]; for (const q of RATINGS) if (pts >= q[0]) r = q; [, title, sub, stars] = r; }
   const pp = s.pts, f = v => Math.round(v);
   const lines = [`🍩 Donitsit ${s.donuts} · ∞ Kahdeksikot ${s.eights} · Kumipaloja ${s.chunks}`,
-    `Show ${f(pp.style)} · Temput ${f(pp.tricks)} · Jäljet ${f(pp.marks)} · Savu ${f(pp.smoke)}`,
+    `🖌️ Kenttä maalattu ${Math.floor(100*s.covN/(s.covTot||1))} % · +${f(pp.cover)}`,
+    `Show ${f(pp.style)} · Temput ${f(pp.tricks)} · Savu ${f(pp.smoke)}`,
     `Kumipalat ${f(pp.chunks)} · Vannekipinät ${f(pp.rims)}${s.hits ? ` · Aita ${s.hits}× ${f(pp.penalty)}` : ''}`];
   if (c.cargo){ const what = c.cargo==='hay' ? '🌾 Paaleja kyydistä' : c.cargo==='cans' ? '🥫 Peltipurkkeja irtosi' : '🧳 Tavaroita lensi'; lines.push(`${what}: ${G.cargoCount} = +${G.cargoPts}`); }
   let best = getBest(), bestTxt;
@@ -1665,6 +1730,7 @@ function update(dt){
     for (let i=0;i<rw.length;i++){
       G.emitAcc[i]+=rate*dt;
       while (G.emitAcc[i]>=1){ G.emitAcc[i]--;
+        if (isFree()){ fsEmitSmoke(rw[i], s, c, p, bx, by); continue; }
         const sp=rand(20,60)*(0.5+s.slip);
         addSmoke(rw[i][0]+rand(-3,3), rw[i][1]+rand(-3,3), bx*sp+rand(-18,18), by*sp+rand(-18,18),
           CWd*rand(0.35,0.6), CWd*rand(1.3,2.3)*(0.7+s.wr/20)*(c.markW?1.2:1), rand(1.6,3.0)*fsm, rand(0.3,0.55)*clamp(0.5+s.wr/15,0,1)*fsm,
@@ -1688,7 +1754,7 @@ function update(dt){
     const [ex,ey]=toWorld(p,-CL*c.len*0.55,CWd*0.25);
     for (let i=0;i<3;i++) addSmoke(ex,ey,rand(-25,25),rand(-25,25),CWd*0.2,CWd*0.9,rand(0.6,1.1),0.55,darkSpr);
   }
-  if (isFree()) fsFrame(dt);
+  if (isFree() && !DBG.noFrame) fsFrame(dt);
   updParticles(dt); updObjects(dt);
   G.shake = Math.max(0, G.shake - dt*25); G.flash = Math.max(0, G.flash - dt*2.2);
   Snd.engineOn = G.engineOn;
@@ -1742,21 +1808,21 @@ function drawProgress(c){
     i%M===0 ? c.moveTo(x,y) : c.lineTo(x,y); }
   c.stroke();
 }
-let lastDt=0.016;
+let lastDt=0.016; const DBG={};
 function render(){
   ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#2e2f32'; ctx.fillRect(0,0,cv.width,cv.height);
   const sx=G.shake>0?rand(-1,1)*G.shake:0, sy=G.shake>0?rand(-1,1)*G.shake:0;
   ctx.setTransform(dpr,0,0,dpr,sx*dpr,sy*dpr);
   ctx.drawImage(bg,0,0,W,H); ctx.drawImage(marks,0,0,W,H);
-  if (isFree()) drawCrowd(ctx);
+  if (isFree() && !DBG.noCrowd) drawCrowd(ctx);
   else if (G.state!=='menu' && G.laps===1) drawProgress(ctx);
   drawObjects(ctx,false);
   const p=pose(), cr=car();
   const dc = () => drawCar(ctx,p.x,p.y,p.ang,cr,CL,CWd,{spin:G.spin, blown:G.blown, cargo:G.cargo, flash:G.flashPh, boost:G.s.boost||0, noBouquet:G.noBouquet,
     brake: G.finished || G.blown || (G.state==='run' && !isHolding())});
-  if (!isFree()) dc();
+  dc();
   drawParticles(ctx);
-  if (isFree()) dc();   // arena: keep the car readable on top of its own smoke cloud
+  if (isFree() && !DBG.noHaze) drawHaze(ctx);
   drawCans(ctx);
   if (G.boosting) drawFlames(ctx,p,cr);
   if (G.flashPh){   // red/blue light flicker: tint the smoke (hue only) + small glow at the roof
@@ -1878,7 +1944,7 @@ window.addEventListener('orientationchange', () => setTimeout(() => { layout(); 
 layout(); toMenuScene(); drawPreviews(); refreshInfo();
 requestAnimationFrame(frame);
 
-window.__burnis = { G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
+window.__burnis = { cnt:()=>({smoke:smoke.length, debris:debris.length, floats:G.floats.length, objs:G.objs.length, shouts:(G.fsShouts||[]).length, fl:(G.fsFlashes||[]).length}), DBG, FSA:()=>FSA, G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
 })();
 </script>
 </body>
