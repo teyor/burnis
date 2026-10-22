@@ -650,10 +650,10 @@ function drawCaddy(c,car,L,w,o){
   c.strokeStyle='rgba(255,255,255,.7)'; c.lineWidth=1; c.beginPath(); c.moveTo(-L*0.47,-w*0.47); c.lineTo(L*0.44,-w*0.47); c.moveTo(-L*0.47,w*0.47); c.lineTo(L*0.44,w*0.47); c.stroke();
 }
 // exhaust flames from the tail pipes (world coords)
-function drawFlames(c,p,car){
+function drawFlames(c,p,car,sides){
   const L=CL*car.len, w=CWd*car.wid;
   c.save();
-  for (const sy of [-0.3,0.3]){
+  for (const sy of (sides||[-0.3,0.3])){
     const [x,y]=toWorld(p,-L*0.55,w*sy), len=L*rand(0.4,0.75), a=p.ang+Math.PI+rand(-0.12,0.12);
     c.save(); c.translate(x,y); c.rotate(a);
     const g=c.createLinearGradient(0,0,len,0); g.addColorStop(0,'rgba(255,255,230,.95)'); g.addColorStop(0.25,'rgba(255,210,60,.9)'); g.addColorStop(0.6,'rgba(255,90,20,.6)'); g.addColorStop(1,'rgba(255,40,0,0)');
@@ -889,7 +889,12 @@ const Snd = {
     for (let i=0;i<7;i++) this.burst(rand(0.03,0.09), rand(1500,3500), rand(600,1200), rand(0.15,0.35), 'bandpass', i*0.08+rand(0,0.04));
     this.burst(0.6, 2500, 1800, 0.08, 'bandpass', 0.05);
   },
-  backfire(v){ if (!this.ok) return; v=v||1; this.burst(0.12, 3500, 200, 0.9*v); this.thump(120,40,0.14,0.9*v); },
+  backfire(v, pan){ if (!this.ok) return; v=v||1;
+    const a=this.ctx, t=a.currentTime, out = a.createStereoPanner ? a.createStereoPanner() : a.createGain(); if (out.pan) out.pan.value = pan||0; out.connect(this.n.master);
+    const s=a.createBufferSource(); s.buffer=this.noiseBuf; const f=a.createBiquadFilter(); f.frequency.setValueAtTime(3500,t); f.frequency.exponentialRampToValueAtTime(200,t+0.12);
+    const g=a.createGain(); g.gain.setValueAtTime(0.9*v,t); g.gain.exponentialRampToValueAtTime(0.0008,t+0.12); s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random()); s.stop(t+0.17);
+    const o=a.createOscillator(), g2=a.createGain(); o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(40,t+0.14);
+    g2.gain.setValueAtTime(0.9*v,t); g2.gain.exponentialRampToValueAtTime(0.0008,t+0.14); o.connect(g2); g2.connect(out); o.start(t); o.stop(t+0.19); },
   exhaustPop(){ if (!this.ok) return; this.burst(0.07, 2500, 300, 0.45); this.thump(160,60,0.08,0.4); },
   overheat(){ if (!this.ok) return; this.burst(0.9, 5000, 2000, 0.3, 'highpass'); this.cough(); },
   clank(){ if (!this.ok) return; const a=this.ctx, t=a.currentTime, o=a.createOscillator(), g=a.createGain(); o.type='square';
@@ -1951,11 +1956,10 @@ function gimFrame(dt){
   const g = G.gim, c = car(), s = G.s; if (!g) return;
   const run = G.state === 'run' || G.state === 'post', hold = isHolding() && run && G.engineOn && !G.blown;
   if (c.popOnLift && run && g.prevHold && !hold && s.r > 0.55){   // lift-off backfire
-    const p = pose(), [ex, ey] = toWorld(p, -CL*c.len*0.55, CWd*c.wid*0.25);
-    Snd.backfire(); for (let i = 0; i < 4; i++) addSmoke(ex, ey, -Math.cos(p.ang)*rand(40,90), -Math.sin(p.ang)*rand(40,90), CWd*0.15, CWd*0.8, rand(0.15,0.3), 0.8, flameSpr);
-    if (Math.random() < 0.5) setTimeout(() => Snd.backfire(0.6), 140);
+    backfireCuda();
   }
   g.prevHold = hold;
+  if (G.bfFl) G.bfFl.t -= dt;
   // Hemi rumble: shake the whole game view (canvas + HUD) via CSS so it is visible on every phone/DPR, + vibration
   const hm = g.hemiOn && run;
   if (hm){ const t = G.clock, x = Math.sin(t*53)*2.6 + rand(-1.2,1.2), y = Math.sin(t*41 + 1)*2.2 + rand(-1,1);
@@ -1985,6 +1989,18 @@ function crushAt(x, y, kind, small){
   for (let i = 0; i < 18; i++){ const a = rand(0, TAU), sp = rand(60, 260); debris.push({ x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, a:rand(0,TAU), va:rand(-12,12), s:rand(1.5,4), life:0, max:rand(0.4,0.9), col:pick(col), stamp:Math.random() < 0.4, thin:kind === 'bale' }); }
   if (kind === 'bale') addStraw(x, y, 14, 120);
   if (free && Math.random() < 0.7) shout(pick(['MURSKAA!','Jee!','Litteäksi!','Monsteri!']), { x, y });
+}
+// dual exhaust backfire: left only / right only / both (~35/35/30), panned pops
+function backfireCuda(again){
+  const c = car(), p = pose(), q = Math.random(), sides = q < 0.35 ? [-1] : q < 0.7 ? [1] : [-1, 1];
+  G.bfLast = sides.length; G.bfFl = { t:0.16, sides:sides.map(sd => sd*0.3) };
+  for (const sd of sides){
+    const [ex, ey] = toWorld(p, -CL*c.len*0.55, sd*CWd*c.wid*0.3);
+    for (let i = 0; i < 5; i++) addSmoke(ex, ey, -Math.cos(p.ang)*rand(40,100), -Math.sin(p.ang)*rand(40,100), CWd*0.16, CWd*0.85, rand(0.15,0.3), 0.85, flameSpr);
+    // screen pan: car's left/right side as seen on screen
+    const sx = -Math.sin(p.ang)*sd; Snd.backfire(again ? 0.6 : (sides.length > 1 ? 0.8 : 1), clamp(sx*0.6, -0.6, 0.6));
+  }
+  if (!again && Math.random() < 0.5) setTimeout(() => { if (G.state === 'run' || G.state === 'post') backfireCuda(true); }, 140);
 }
 // wheelie angle gauge (monster) - drawn on the main canvas
 function drawWheelieG(c){
@@ -2272,6 +2288,7 @@ function render(){
   if (isFree() && !DBG.noHaze) drawHaze(ctx);
   drawCans(ctx);
   if (G.boosting) drawFlames(ctx,p,cr);
+  if (G.bfFl && G.bfFl.t>0) drawFlames(ctx,p,cr,G.bfFl.sides);
   if (G.flashPh){   // red/blue light flicker: tint the smoke (hue only) + small glow at the roof
     ctx.save(); const red=G.flashPh===1;
     ctx.globalCompositeOperation='color'; let rad=CL*3.6, g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rad);
