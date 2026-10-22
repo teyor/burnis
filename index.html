@@ -97,6 +97,7 @@
   .seg.wide{width:auto;padding:0 12px}
   .row{margin-top:10px}
   #cargoTxt{color:#ffcf5a;font-weight:800}
+  #bigmsg.hemi{color:#e2b6ff;text-shadow:0 0 18px #8a2be2,0 3px 0 #000}
   /* 9 cars: compact start screen so the 3x3 grid fits a phone */
   #startScreen{justify-content:safe center;overflow-y:auto}
   #startScreen h1.logo{font-size:50px}
@@ -1608,6 +1609,7 @@ function shout(text, near){
   if (!crowd.length || G.fsShouts.length >= 3) return;
   let sp = crowd[Math.floor(rand(0, crowd.length))];
   if (near) { let best = null, bd = 1e9; for (let k = 0; k < 12; k++){ const q = crowd[Math.floor(rand(0, crowd.length))], d = Math.hypot(q.x - near.x, q.y - near.y); if (d < bd){ bd = d; best = q; } } sp = best || sp; }
+  if (isDust()) text = text.replace('POLTA', 'JAUHA').replace('Polta', 'Jauha');
   G.fsShouts.push({ x: sp.x, y: sp.y, fx: sp.fx, fy: sp.fy, text, life: 0 });
 }
 const SHOUTS = { mid:['Vielä!','Lisää savua!','Kaasua!','Jee!','Polta!'], high:['Vielä!','Lisää savua!','POLTA!','Ihan sairasta!','Hyvä hyvä!','Legenda!','Donitsi!','Kaasu pohjaan!'],
@@ -1648,7 +1650,9 @@ function fsStep(dt){
   if (G.state === 'run'){
     G.runT += dt;
     const hold = isHolding() && G.engineOn;
+    if (G.gim) G.gim.t0 = fsTotal(s);
     const o = fsPhys(s, hold, steerVal(), c, dt, FSA);
+    if (G.gim && (s.wh || 0) > 0.2){ const d = fsTotal(s) - G.gim.t0; if (d > 0) G.gim.whPts += d/2; }
     gimStep(s, hold, c, dt, true); if (G.state !== 'run') return;
     const p = pose();
     for (const [ev, pts] of o.events){
@@ -1854,7 +1858,7 @@ function fsResults(){
 // ---------------------------------------------------------------- v7 cars: Hemi Cuda, '32 hot rod, monster truck (gimmicks shared by all modes)
 const redSmk = [makeSprite(205,45,45), makeSprite(185,70,70), makeSprite(225,90,85)];
 function gimReset(){
-  G.gim = { pts:0, hemiT:0, hemiOn:false, hemiTot:0, luckT:rand(3,6), lastHic:false, pmT:0, surges:0, hics:0, whHold:0, whOn:false, whTot:0, crushN:0, crushPts:0, prevHold:false, chunkT:0 };
+  G.gim = { pts:0, hemiT:0, hemiOn:false, hemiTot:0, luckT:rand(3,6), lastHic:false, pmT:0, surges:0, hics:0, whHold:0, whOn:false, whTot:0, whPts:0, t0:0, vibT:0, crushN:0, crushPts:0, prevHold:false, chunkT:0 };
   G.s.wh = 0; G.s.pm = 1; G.props = [];
   if (car().monster) gimProps();
 }
@@ -1903,11 +1907,12 @@ function gimStep(s, hold, c, dt, free){
   const g = G.gim; if (!g) return;
   const M = free ? (s.M || 1) : 1, add = v => { if (free) s.pts.gim = (s.pts.gim || 0) + v; else g.pts += v; };
   if (c.hemi){
-    if (hold && s.r > 0.85 && !s.blown) g.hemiT += dt; else g.hemiT = Math.max(0, g.hemiT - 2.5*dt);
-    const on = g.hemiT > 1.4;
-    if (on && !g.hemiOn){ const p = pose(); G.floats.push({ x:p.x, y:p.y - 16, text:'HEMI-JYRINÄ!', life:0, col:'#c48aff' }); Snd.thump(45, 30, 0.5, 0.9); }
+    if (hold && s.r > 0.8 && !s.blown) g.hemiT += dt; else g.hemiT = Math.max(0, g.hemiT - 2.5*dt);
+    g.hemiT = Math.min(g.hemiT, 1.2);
+    const on = g.hemiT > 0.8 && hold && s.r > 0.8;
+    if (on && !g.hemiOn){ showMsg('HEMI-JYRINÄ!<small>Maa tärisee!</small>', 'show sm hemi'); Snd.thump(45, 30, 0.5, 0.9); g.vibT = 0; }
     g.hemiOn = on;
-    if (on){ g.hemiTot += dt; G.shake = Math.max(G.shake, 1.4);
+    if (on){ g.hemiTot += dt; G.shake = Math.max(G.shake, 1.5);
       if (free){ s.S = Math.min(1, s.S + 0.06*dt); G.fsBump = Math.max(G.fsBump, 0.15); add(7*M*dt); } else add(5*dt); }
   }
   if (c.luck){
@@ -1929,7 +1934,7 @@ function gimStep(s, hold, c, dt, free){
     const on = s.wh > 0.2;
     if (on && !g.whOn){ const p = pose(); G.floats.push({ x:p.x, y:p.y - 18, text:'KEULII! ×2', life:0, col:'#7dff6a' }); if (free) shout('KEULII!!', p); }
     g.whOn = on; if (on) g.whTot += dt;
-    if (on && !free) add(s.wr*dt*10);   // track: wear points count double while the front is up
+    if (on && !free){ add(s.wr*dt*10); g.whPts += s.wr*dt*10; }   // track: wear points count double while the front is up
     if (s.wh >= 1) gimFlip();
   }
 }
@@ -1951,6 +1956,12 @@ function gimFrame(dt){
     if (Math.random() < 0.5) setTimeout(() => Snd.backfire(0.6), 140);
   }
   g.prevHold = hold;
+  // Hemi rumble: shake the whole game view (canvas + HUD) via CSS so it is visible on every phone/DPR, + vibration
+  const hm = g.hemiOn && run;
+  if (hm){ const t = G.clock, x = Math.sin(t*53)*2.6 + rand(-1.2,1.2), y = Math.sin(t*41 + 1)*2.2 + rand(-1,1);
+    const tr = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`; cv.style.transform = tr; el.hud.style.transform = tr; G.hemiVis = true;
+    g.vibT -= dt; if (g.vibT <= 0){ g.vibT = 0.4; try{ navigator.vibrate && navigator.vibrate([70,30,70,30,90]); }catch(e){} } }
+  else if (G.hemiVis){ G.hemiVis = false; cv.style.transform = ''; el.hud.style.transform = ''; try{ navigator.vibrate && navigator.vibrate(0); }catch(e){} }
   if (G.fail === 'flip') G.flipT = (G.flipT || 0) + dt;
   if (!c.monster) return;
   const p = pose();
@@ -1998,7 +2009,7 @@ function gimLines(free){
   const f = v => Math.round(v), gp = free ? (G.s.pts.gim || 0) : g.pts;
   if (c.hemi) return [`🟣 Hemi-jyrinä ${g.hemiTot.toFixed(1)} s · +${f(free ? gp : g.pts)}`];
   if (c.luck) return [`⚡ Tehopiikit ${g.surges} · Nikottelut ${g.hics} · +${f(gp)}`];
-  if (c.monster) return [`🛻 Keulinta ${g.whTot.toFixed(1)} s · Murskattu ${g.crushN} · +${f(gp)}`];
+  if (c.monster) return [`🛻 Keulinta ${g.whTot.toFixed(1)} s · +${f(g.whPts)} · Murskattu ${g.crushN} · +${f(g.crushPts)}`];
   return [];
 }
 // ---- drawings
@@ -2097,7 +2108,7 @@ function update(dt){
     s.slip=0; s.wr=0;
     const n=Math.ceil(G.cd);
     if (n!==G.lastCd && n>0){ G.lastCd=n; showMsg(String(n),'show'); Snd.thump(220,200,0.08,0.25); }
-    if (G.cd<=0){ G.state='run'; showMsg('POLTA!','show'); Snd.thump(440,430,0.15,0.3); }
+    if (G.cd<=0){ G.state='run'; showMsg(isDust() ? 'JAUHA!' : 'POLTA!','show'); Snd.thump(440,430,0.15,0.3); }
   } else if (G.state==='run'||G.state==='post'||G.state==='end'){
     const n=Math.max(1,Math.ceil(dt/0.008));
     for (let i=0;i<n && (G.state==='run'||G.state==='post'||G.state==='end');i++) stepRun(dt/n);
