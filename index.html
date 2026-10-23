@@ -1673,10 +1673,10 @@ function fsStep(dt){
     const o = fsPhys(s, hold, steerVal(), c, dt, isOut() ? outAr() : FSA);
     if (G.gim && (s.wh || 0) > 0.2){ const d = fsTotal(s) - G.gim.t0; if (d > 0) G.gim.whPts += d/2; }
     gimStep(s, hold, c, dt, true); if (G.state !== 'run') return;
-    if (isOut() && outStep(s, c, dt, fsTotal(s) - ot0)) return;
+    if (isOut() && outStep(s, c, dt, fsTotal(s) - ot0, o)) return;
     const p = pose();
     for (const [ev, pts] of o.events){
-      if (ev === 'hit'){ Snd.boo(); G.shake = Math.max(G.shake, 7); G.fsBump = -0.6; G.floats.push({ x:p.x, y:p.y - 14, text:'AITA! −60', life:0, col:'#ff6a5a' }); shout(pick(SHOUTS.boo), p);
+      if (ev === 'hit'){ Snd.boo(); G.shake = Math.max(G.shake, 7); G.fsBump = -0.6; if (!isOut()) G.floats.push({ x:p.x, y:p.y - 14, text:'AITA! −60', life:0, col:'#ff6a5a' }); shout(pick(SHOUTS.boo), p);
         Snd.thump(90, 40, 0.18, 0.7); for (let i = 0; i < 10; i++) debris.push({x:p.x,y:p.y,vx:rand(-140,140),vy:rand(-140,140),a:0,va:0,s:1.5,life:0,max:rand(0.15,0.35),col:'#ffd23a'}); }
       else if (ev === 'donut'){ G.floats.push({ x:p.x, y:p.y - 14, text:`DONITSI! +${pts}`, life:0 }); G.fsBump = Math.max(G.fsBump, 0.25); if (Math.random() < 0.6) shout(pick(SHOUTS.high), p); }
       else if (ev === 'eight'){ showMsg(`KAHDEKSIKKO!<small>+${pts}</small>`, 'show'); G.fsBump = Math.max(G.fsBump, 0.5); Snd.crowdCheer(); shout('KAHDEKSIKKO!!', p); }
@@ -2138,8 +2138,7 @@ function outLayout(){
   const { x0, x1, y0, y1 } = AR, fw = x1 - x0, fh = y1 - y0;
   const gw = CL*2.3, gx = (x0 + x1)/2;
   OUT = { gx, gw, lamps: [[x0 + fw*0.2, y0 + fh*0.22], [x1 - fw*0.2, y0 + fh*0.45], [x0 + fw*0.25, y0 + fh*0.75], [x1 - fw*0.18, y1 - fh*0.08]].map(([x,y]) => ({ x, y, r:CL*2.1 })),
-    wrecks: [{ x:x0 + fw*0.78, y:y0 + fh*0.2, a:0.4, car:{ ...CARS.valiant, body:'#4b5560', bodyDark:'#262b31', roof:'#3a3f45' } },
-             { x:x0 + fw*0.2, y:y0 + fh*0.55, a:-1.3, car:{ ...CARS.wagon, body:'#5a4a3a', bodyDark:'#2e251c', roof:'#4a3c2e' } }],
+    wrecks: [{ x:x0 + fw*0.5, y:y0 + fh*0.8, a:-1.3, car:{ ...CARS.wagon, body:'#5a4a3a', bodyDark:'#2e251c', roof:'#4a3c2e' } }],
     diner: { x:x0 + 6, y:y1 + AR.wall + 3, w:Math.min(160, fw*0.48), h:Math.max(30, AR.sb - AR.wall - 6) } };
   if (G.outPhase === 'street') outStreetBounds();
   buildDark();
@@ -2239,11 +2238,16 @@ function outAr(){
   return FSA;
 }
 // called from fsStep after physics; returns true when it took over this step
-function outStep(s, c, dt, d){
+function outStep(s, c, dt, d, o){
   const p = pose();
   if (G.outPhase === 'lot'){
     G.outRM = outRisk(s);
-    if (d > 0) G.lotPts += d*G.outRM; else if (d < 0) G.lotPts = Math.max(0, G.lotPts + d);
+    if (d > 0) G.lotPts += d*G.outRM;
+    // fence/wall hits cost points (own penalty replaces the generic −60; cooldown so scraping doesn't drain)
+    G.outHitCd = Math.max(0, (G.outHitCd || 0) - dt);
+    if (o && o.hit > 0.35 && G.outHitCd <= 0){ G.outHitCd = 0.9; const pen = Math.round(Math.min(G.lotPts, 40 + 40*Math.min(o.hit, 3)));
+      G.lotPts = Math.max(0, G.lotPts - pen); const pp = pose(); if (pen > 0) G.floats.push({ x:pp.x, y:pp.y - 26, text:`AITA! −${pen}`, life:0, col:'#ff3b30' });
+      G.shake = Math.max(G.shake, 5); if (o.hit <= 0.9) Snd.thump(90, 40, 0.14, 0.6); }
     // abandoned cars: solid
     for (const w of OUT.wrecks){ const dx = s.x - w.x/CL, dy = s.y - w.y/CL, dd = Math.hypot(dx, dy); if (dd < 0.72){ const k = (0.72 - dd)/Math.max(dd, 0.01); s.x += dx*k; s.y += dy*k; s.vx *= 0.6; s.vy *= 0.6; } }
     if (s.wear >= 100 || s.T >= 1){ outCaught(s.wear >= 100 ? 'tyre' : 'engine'); return true; }
@@ -2320,9 +2324,10 @@ function outDrawOver(c, p, cr){
   const L = G.outPhase === 'street' ? OUT.lampsS : OUT.lamps;
   for (const l of L){ const g = c.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r); g.addColorStop(0, 'rgba(255,200,90,.22)'); g.addColorStop(0.6, 'rgba(255,170,60,.07)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(l.x - l.r, l.y - l.r, 2*l.r, 2*l.r); }
   // car headlights
-  if (G.engineOn && G.fail !== 'flip'){ const L2 = CL*cr.len, [hx, hy] = toWorld(p, L2*0.5, 0), r = CL*2.4, g = c.createRadialGradient(hx, hy, 0, hx, hy, r);
-    g.addColorStop(0, 'rgba(255,250,215,.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g;
-    c.beginPath(); c.moveTo(hx, hy); c.arc(hx, hy, r, p.ang - 0.42, p.ang + 0.42); c.closePath(); c.fill(); }
+  if (G.engineOn && G.fail !== 'flip'){ const L2 = CL*cr.len, w2 = CWd*cr.wid, r = CL*2.3;
+    for (const sd of [-1, 1]){ const [hx, hy] = toWorld(p, L2*0.47, sd*w2*0.34), a = p.ang + sd*0.06, g = c.createRadialGradient(hx, hy, 0, hx, hy, r);
+      g.addColorStop(0, 'rgba(255,250,215,.24)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g;
+      c.beginPath(); c.moveTo(hx, hy); c.arc(hx, hy, r, a - 0.3, a + 0.3); c.closePath(); c.fill(); } }
   // diner neon (flickers)
   if (G.outPhase === 'lot'){ const D = OUT.diner, on = Math.random() > (Math.sin(G.clock*1.7) > 0.85 ? 0.6 : 0.04);
     c.globalCompositeOperation = 'source-over'; c.font = '900 17px system-ui,Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
