@@ -1549,7 +1549,7 @@ function fsArenaBg(b){
   b.fillText('★ FREESTYLE-AREENA ★', W/2, y0 + 24);
 }
 function fsStartState(){
-  const s = fsNew(); s.dirt = isDust(); s.x = (FSA.x0 + FSA.x1)/2/1; s.y = FSA.y0 + (FSA.y1 - FSA.y0)*0.55; s.h = -Math.PI/2; return s;
+  const s = fsNew(); s.dirt = isDust(); s.x = (FSA.x0 + FSA.x1)/2/1; s.y = FSA.y0 + (FSA.y1 - FSA.y0)*(isOut() ? 0.4 : 0.55); s.h = -Math.PI/2; return s;
 }
 function fsPose(){
   const s = G.s, jit = G.state==='run' && !s.blown ? s.slip*1.2 : (s.blown && G.state==='run' ? 0.8 : 0);
@@ -2138,7 +2138,7 @@ function outLayout(){
   const { x0, x1, y0, y1 } = AR, fw = x1 - x0, fh = y1 - y0;
   const gw = CL*2.3, gx = (x0 + x1)/2;
   OUT = { gx, gw, lamps: [[x0 + fw*0.2, y0 + fh*0.22], [x1 - fw*0.2, y0 + fh*0.45], [x0 + fw*0.25, y0 + fh*0.75], [x1 - fw*0.18, y1 - fh*0.08]].map(([x,y]) => ({ x, y, r:CL*2.1 })),
-    wrecks: [{ x:x0 + fw*0.5, y:y0 + fh*0.8, a:-1.3, car:{ ...CARS.wagon, body:'#5a4a3a', bodyDark:'#2e251c', roof:'#4a3c2e' } }],
+    wrecks: [{ x:x0 + fw*0.5, y:y0 + fh*0.66, a:-1.3, car:{ ...CARS.wagon, body:'#5a4a3a', bodyDark:'#2e251c', roof:'#4a3c2e' } }],
     diner: { x:x0 + 6, y:y1 + AR.wall + 3, w:Math.min(160, fw*0.48), h:Math.max(30, AR.sb - AR.wall - 6) } };
   if (G.outPhase === 'street') outStreetBounds();
   buildDark();
@@ -2221,7 +2221,7 @@ function outBg(b){
 }
 // carts
 function outReset(){
-  G.outPhase = 'lot'; G.lotPts = 0; G.outRM = 1; G.outMult = 0; G.outBurstM = null; G.outCop = null; G.outCart = 0; G.outCarts = 0; G.outT0 = 0; G.outEnd = null; G.crT = rand(0.5, 2);
+  G.outPhase = 'lot'; G.lotPts = 0; G.outRM = 1; G.outMult = 0; G.outBurstM = null; G.outCop = null; G.outCart = 0; G.outCarts = 0; G.outT0 = 0; G.outEnd = null; G.crT = rand(0.5, 2); G.ringA = 0; G.ringPrev = null; G.ringN = 0; G.outNeonT = 0;
   if (OUT && AR){ fsLayout(); genBackground(); }
   G.carts = [];
   if (OUT) for (let i = 0; i < 5; i++){ const x = rand(AR.x0 + CL*0.6, AR.x1 - CL*0.6), y = rand(AR.y0 + CL*0.6, AR.y1 - CL*0.8);
@@ -2238,6 +2238,22 @@ function outAr(){
   return FSA;
 }
 // called from fsStep after physics; returns true when it took over this step
+// PASKARINKI: full 360° slide around the wreck without touching it or a wall
+function outRing(s){
+  const w = OUT.wrecks[0]; if (!w) return;
+  const dx = s.x - w.x/CL, dy = s.y - w.y/CL, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+  if (r < 0.75 || r > 2.6){ G.ringA = 0; G.ringPrev = null; return; }
+  if (G.ringPrev != null && (s.r || 0) > 0.25){ let da = a - G.ringPrev; da = Math.atan2(Math.sin(da), Math.cos(da)); G.ringA = (G.ringA || 0) + da; }
+  G.ringPrev = a;
+  if (Math.abs(G.ringA || 0) >= 2*Math.PI){
+    G.ringA = 0; G.ringN = (G.ringN || 0) + 1;
+    const bonus = Math.round(600*G.outRM*Math.max(0.4, Math.pow(0.85, G.ringN - 1)));
+    G.lotPts += bonus; G.outNeonT = G.clock + 1.6; G.fsBump = Math.max(G.fsBump || 0, 0.6); G.shake = Math.max(G.shake, 6);
+    showMsg(`PASKARINKI!<small>+${bonus}${G.ringN > 1 ? ` · ${G.ringN}.` : ''}</small>`, 'show');
+    const pp = pose(); G.floats.push({ x:pp.x, y:pp.y - 30, text:`PASKARINKI! +${bonus}`, life:0, col:'#ff5ec4' });
+    Snd.cheer(); Snd.crowdCheer(); if (typeof shout === 'function') shout('PASKARINKI!!', pp);
+  }
+}
 function outStep(s, c, dt, d, o){
   const p = pose();
   if (G.outPhase === 'lot'){
@@ -2246,10 +2262,11 @@ function outStep(s, c, dt, d, o){
     // fence/wall hits cost points (own penalty replaces the generic −60; cooldown so scraping doesn't drain)
     G.outHitCd = Math.max(0, (G.outHitCd || 0) - dt);
     if (o && o.hit > 0.35 && G.outHitCd <= 0){ G.outHitCd = 0.9; const pen = Math.round(Math.min(G.lotPts, 40 + 40*Math.min(o.hit, 3)));
-      G.lotPts = Math.max(0, G.lotPts - pen); const pp = pose(); if (pen > 0) G.floats.push({ x:pp.x, y:pp.y - 26, text:`AITA! −${pen}`, life:0, col:'#ff3b30' });
-      G.shake = Math.max(G.shake, 5); if (o.hit <= 0.9) Snd.thump(90, 40, 0.14, 0.6); }
+      G.lotPts = Math.max(0, G.lotPts - pen); const pp = pose(); if (pen > 0) G.floats.push({ x:pp.x, y:pp.y - 26, text:`SEINÄ! −${pen}`, life:0, col:'#ff3b30' });
+      G.ringA = 0; G.shake = Math.max(G.shake, 5); if (o.hit <= 0.9) Snd.thump(90, 40, 0.14, 0.6); }
     // abandoned cars: solid
-    for (const w of OUT.wrecks){ const dx = s.x - w.x/CL, dy = s.y - w.y/CL, dd = Math.hypot(dx, dy); if (dd < 0.72){ const k = (0.72 - dd)/Math.max(dd, 0.01); s.x += dx*k; s.y += dy*k; s.vx *= 0.6; s.vy *= 0.6; } }
+    for (const w of OUT.wrecks){ const dx = s.x - w.x/CL, dy = s.y - w.y/CL, dd = Math.hypot(dx, dy); if (dd < 0.72){ G.ringA = 0; const k = (0.72 - dd)/Math.max(dd, 0.01); s.x += dx*k; s.y += dy*k; s.vx *= 0.6; s.vy *= 0.6; } }
+    outRing(s);
     if (s.wear >= 100 || s.T >= 1){ outCaught(s.wear >= 100 ? 'tyre' : 'engine'); return true; }
     if (s.y < FSA.y0 - 0.4){ outGate(); return true; }
     return false;
@@ -2329,9 +2346,9 @@ function outDrawOver(c, p, cr){
       g.addColorStop(0, 'rgba(255,250,215,.24)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g;
       c.beginPath(); c.moveTo(hx, hy); c.arc(hx, hy, r, a - 0.3, a + 0.3); c.closePath(); c.fill(); } }
   // diner neon (flickers)
-  if (G.outPhase === 'lot'){ const D = OUT.diner, on = Math.random() > (Math.sin(G.clock*1.7) > 0.85 ? 0.6 : 0.04);
+  if (G.outPhase === 'lot'){ const D = OUT.diner, flare = G.clock < (G.outNeonT || 0), on = flare || Math.random() > (Math.sin(G.clock*1.7) > 0.85 ? 0.6 : 0.04);
     c.globalCompositeOperation = 'source-over'; c.font = '900 17px system-ui,Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = on ? '#ff5ec4' : '#5a2a48'; c.shadowColor = '#ff2ab0'; c.shadowBlur = on ? 14 : 0; c.fillText('DINER', D.x + D.w*0.4, D.y + 11);
+    c.fillStyle = on ? '#ff5ec4' : '#5a2a48'; c.shadowColor = '#ff2ab0'; c.shadowBlur = flare ? 34 : on ? 14 : 0; c.fillText('DINER', D.x + D.w*0.4, D.y + 11);
     c.fillStyle = on ? '#6ad8ff' : '#2a4a5a'; c.shadowColor = '#2ab8ff'; c.font = '900 10px system-ui,Arial'; c.fillText('★ OUTLAW STAR ★', D.x + D.w*0.4, D.y + D.h - 7); c.shadowBlur = 0; c.textBaseline = 'alphabetic'; }
   c.restore();
   // police
@@ -2687,7 +2704,7 @@ window.addEventListener('orientationchange', () => setTimeout(() => { layout(); 
 layout(); toMenuScene(); drawPreviews(); refreshInfo();
 requestAnimationFrame(frame);
 
-window.__burnis = { out:()=>({gx:OUT&&OUT.gx/CL, phase:G.outPhase, lot:G.lotPts, rm:G.outRM, dist:G.outDist, burst:G.outBurstM, locked:G.lotLocked, carts:G.outCarts}), gim:()=>G.gim, props:()=>G.props, puddles:()=>puddles, wind:()=>G.wind, cnt:()=>({smoke:smoke.length, debris:debris.length, floats:G.floats.length, objs:G.objs.length, shouts:(G.fsShouts||[]).length, fl:(G.fsFlashes||[]).length}), DBG, FSA:()=>FSA, G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
+window.__burnis = { OUT:()=>OUT, CL:()=>CL, out:()=>({gx:OUT&&OUT.gx/CL, phase:G.outPhase, lot:G.lotPts, rm:G.outRM, dist:G.outDist, burst:G.outBurstM, locked:G.lotLocked, carts:G.outCarts}), gim:()=>G.gim, props:()=>G.props, puddles:()=>puddles, wind:()=>G.wind, cnt:()=>({smoke:smoke.length, debris:debris.length, floats:G.floats.length, objs:G.objs.length, shouts:(G.fsShouts||[]).length, fl:(G.fsFlashes||[]).length}), DBG, FSA:()=>FSA, G, CARS, TRACKS, physStep, newRun, Snd, fsPhys, FS_K, FSP, fsTotal, steerVal, AR:()=>AR, smokeCount: () => smoke.length, path: () => path };
 })();
 </script>
 </body>
